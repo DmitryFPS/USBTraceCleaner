@@ -1,0 +1,166 @@
+<Window x:Class="USBTraceCleaner.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="USB Trace Cleaner — Windows 10/11"
+        Height="720" Width="1100"
+        MinHeight="580" MinWidth="900"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BgBrush}"
+        FontFamily="Segoe UI">
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="120"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,10">
+            <TextBlock Text="USB Trace Cleaner" FontSize="20" FontWeight="SemiBold"
+                       Foreground="{StaticResource TextPrimaryBrush}"/>
+            <TextBlock x:Name="TxtSubtitle"
+                       Text="Очистка следов USB-устройств в реестре, логах и файловой системе"
+                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,2,0,0"/>
+            <TextBlock x:Name="TxtAdminWarning" Foreground="{StaticResource DangerBrush}"
+                       FontWeight="SemiBold" FontSize="12" Margin="0,4,0,0"
+                       Visibility="Collapsed" Text="⚠ Запустите программу от имени администратора"/>
+        </StackPanel>
+
+        <!-- Options: компактные карточки слева, без растягивания на всю ширину -->
+        <Border Grid.Row="1" Style="{StaticResource MainCard}" Margin="0,0,0,10">
+            <StackPanel Orientation="Horizontal" Margin="10,8">
+                <Border Style="{StaticResource OptionCard}" Margin="0,0,10,0">
+                    <StackPanel Width="200">
+                        <TextBlock Text="БЭКАП" Style="{StaticResource SectionHeader}"/>
+                        <CheckBox x:Name="ChkBackup" Style="{StaticResource CompactCheckBox}"
+                                  Content="Сохранить .reg-бэкап" IsChecked="True"/>
+                        <CheckBox x:Name="ChkRestorePoint" Style="{StaticResource CompactCheckBox}"
+                                  Content="Точка восстановления" IsChecked="True"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource OptionCard}" Margin="0,0,10,0">
+                    <StackPanel Width="200">
+                        <TextBlock Text="ПРИ ОЧИСТКЕ" Style="{StaticResource SectionHeader}"/>
+                        <CheckBox x:Name="ChkCloseExplorer" Style="{StaticResource CompactCheckBox}"
+                                  Content="Закрыть Проводник" IsChecked="True"/>
+                        <CheckBox x:Name="ChkReboot" Style="{StaticResource CompactCheckBox}"
+                                  Content="Перезагрузить Windows" IsChecked="True"/>
+                        <CheckBox x:Name="ChkMtp" Style="{StaticResource CompactCheckBox}"
+                                  Content="Очищать MTP (телефоны)" IsChecked="True"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource OptionCard}">
+                    <StackPanel Width="280">
+                        <TextBlock Text="ЛОГИ И СЛЕДЫ EXPLORER" Style="{StaticResource SectionHeader}"/>
+                        <CheckBox x:Name="ChkScrubLogs" Style="{StaticResource CompactCheckBox}"
+                                  Content="Чистить логи (не удалять setupapi.dev.log)" IsChecked="True"/>
+                        <CheckBox x:Name="ChkPreserveLogDates" Style="{StaticResource CompactCheckBox}"
+                                  Content="Сохранять даты файлов логов" IsChecked="True"/>
+                        <CheckBox x:Name="ChkShellBags" Style="{StaticResource CompactCheckBox}"
+                                  Content="ShellBags (история папок)" IsChecked="True"/>
+                        <CheckBox x:Name="ChkRecentLinks" Style="{StaticResource CompactCheckBox}"
+                                  Content="Recent / Jump Lists" IsChecked="True"/>
+                        <CheckBox x:Name="ChkBam" Style="{StaticResource CompactCheckBox}"
+                                  Content="BAM/DAM (запуск с USB)" IsChecked="True"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- Results -->
+        <Border Grid.Row="2" Style="{StaticResource MainCard}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="210"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Background="{StaticResource SidebarBrush}"
+                        BorderBrush="{StaticResource BorderBrushModern}" BorderThickness="0,0,1,0">
+                    <DockPanel Margin="0,6">
+                        <TextBlock DockPanel.Dock="Top" Text="Категории"
+                                   FontWeight="SemiBold" FontSize="12"
+                                   Foreground="{StaticResource AccentBrush}"
+                                   Margin="14,6,14,4"/>
+                        <ListBox x:Name="LstCategories" Style="{StaticResource CategoryListBox}"
+                                 ItemContainerStyle="{StaticResource CategoryListBoxItem}"
+                                 SelectionChanged="LstCategories_SelectionChanged">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Label}" TextWrapping="Wrap"/>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </DockPanel>
+                </Border>
+
+                <Grid Grid.Column="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <DockPanel Margin="12,8,12,6">
+                        <TextBox x:Name="TxtSearch" DockPanel.Dock="Right" Width="220"
+                                 Padding="8,5" FontSize="12"
+                                 BorderBrush="{StaticResource BorderBrushModern}"
+                                 ToolTip="Поиск по пути или описанию"/>
+                        <TextBlock x:Name="TxtFoundCount" Text="Найдено: 0"
+                                   FontWeight="SemiBold" FontSize="12.5"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   VerticalAlignment="Center"/>
+                    </DockPanel>
+                    <DataGrid x:Name="GridArtifacts" Grid.Row="1" Margin="8,0,8,8"
+                              AutoGenerateColumns="False" IsReadOnly="False"
+                              CanUserAddRows="False" CanUserDeleteRows="False"
+                              SelectionMode="Extended">
+                        <DataGrid.Columns>
+                            <DataGridCheckBoxColumn Header="✓" Binding="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" Width="36"/>
+                            <DataGridTextColumn Header="Раздел" Binding="{Binding DisplayViewGroup}" Width="140" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Тип" Binding="{Binding Type}" Width="80" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Расположение" Binding="{Binding Location}" Width="*" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Описание" Binding="{Binding Description}" Width="160" IsReadOnly="True"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- Progress -->
+        <StackPanel Grid.Row="3" Margin="0,6,0,0">
+            <TextBlock x:Name="TxtPhase" Text="" Foreground="{StaticResource TextSecondaryBrush}"
+                       FontSize="11" Margin="0,0,0,3"/>
+            <ProgressBar x:Name="ProgressBar" Height="4" Minimum="0" Maximum="100"
+                         Background="#E2E8F0" Foreground="{StaticResource AccentBrush}"/>
+        </StackPanel>
+
+        <!-- Log -->
+        <Border Grid.Row="4" Background="#1E293B" CornerRadius="8" Margin="0,6,0,6">
+            <TextBox x:Name="TxtLog" Background="Transparent" Foreground="#E2E8F0"
+                     FontFamily="Cascadia Mono, Consolas" FontSize="11" IsReadOnly="True"
+                     VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                     BorderThickness="0" Padding="10,8"/>
+        </Border>
+
+        <!-- Buttons -->
+        <DockPanel Grid.Row="5">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="BtnSelectAll" Content="Выбрать все" Style="{StaticResource SecondaryButton}"
+                        MinWidth="100" Margin="0,0,6,0" Click="BtnSelectAll_Click"/>
+                <Button x:Name="BtnDeselectAll" Content="Снять все" Style="{StaticResource SecondaryButton}"
+                        MinWidth="100" Margin="0,0,6,0" Click="BtnDeselectAll_Click"/>
+                <Button x:Name="BtnScan" Content="Сканировать" Style="{StaticResource PrimaryButton}"
+                        MinWidth="120" Margin="0,0,6,0" Click="BtnScan_Click"/>
+                <Button x:Name="BtnFixDuplicates" Content="Удалить призраки" Style="{StaticResource SecondaryButton}"
+                        MinWidth="130" Margin="0,0,6,0" Click="BtnFixDuplicates_Click"
+                        ToolTip="Найти дубликаты и призрачные записи PnP, показать в таблице и удалить"/>
+                <Button x:Name="BtnClean" Content="Очистить" Style="{StaticResource DangerButton}"
+                        MinWidth="120" Click="BtnClean_Click"/>
+            </StackPanel>
+        </DockPanel>
+    </Grid>
+</Window>

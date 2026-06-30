@@ -1,0 +1,23 @@
+# Build
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+publish/
+out/
+
+# IDE
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Logs / backups from app runs
+USBTraceCleaner_backup_*.reg
+USBTraceCleaner_manifest_*.txt
