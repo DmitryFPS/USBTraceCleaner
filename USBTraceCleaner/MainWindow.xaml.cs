@@ -1,9 +1,12 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Threading;
 using USBTraceCleaner.Models;
 using USBTraceCleaner.Services;
+using USBTraceCleaner.Views;
 
 namespace USBTraceCleaner;
 
@@ -16,7 +19,9 @@ public partial class MainWindow : Window
     private readonly ArtifactCleaner _cleaner = new();
     private CancellationTokenSource? _cts;
     private bool _isReady;
+    private bool _isNetworkTab;
     private ArtifactViewGroup _activeGroup = ArtifactViewGroup.All;
+    private NetworkAuditFilterGroup _activeNetworkGroup = NetworkAuditFilterGroup.All;
 
     public MainWindow()
     {
@@ -28,18 +33,17 @@ public partial class MainWindow : Window
         GridArtifacts.ItemsSource = _filteredView;
         LstCategories.ItemsSource = _categories;
         LstCategories.SelectionChanged += LstCategories_SelectionChanged;
-        TxtSearch.TextChanged += TxtSearch_TextChanged;
 
         InitCategories();
         LstCategories.SelectedIndex = 0;
         _isReady = true;
 
-        TxtSubtitle.Text += $" | {AdminHelper.GetWindowsVersionLabel()}";
+        TxtOsBadge.Text = AdminHelper.GetWindowsVersionLabel();
 
         if (!AdminHelper.IsAdministrator())
             TxtAdminWarning.Visibility = Visibility.Visible;
 
-        AppendLog("USB Trace Cleaner v1.1 — только Windows 10/11");
+        AppendLog("Очистка следов USB v1.1 — Windows 10/11");
         AppendLog("Перед очисткой отключите все USB-накопители.");
         AppendLog("Слева — категории; «Призраки / дубликаты» — лишние записи PnP.");
         AppendLog("«Сканировать» — показать следы. «Очистить» — удалить выбранное.");
@@ -161,6 +165,33 @@ public partial class MainWindow : Window
         UpdateCategoryCounts();
         _filteredView.Refresh();
         UpdateCount();
+        ScheduleAutoFitGridColumns();
+    }
+
+    private void ScheduleAutoFitGridColumns()
+    {
+        Dispatcher.BeginInvoke(AutoFitGridColumns, DispatcherPriority.Loaded);
+    }
+
+    private void AutoFitGridColumns()
+    {
+        if (GridArtifacts.Columns.Count == 0)
+            return;
+
+        GridArtifacts.UpdateLayout();
+
+        foreach (var column in GridArtifacts.Columns)
+        {
+            if (column is DataGridCheckBoxColumn)
+            {
+                column.Width = new DataGridLength(40);
+                continue;
+            }
+
+            column.Width = new DataGridLength(1, DataGridLengthUnitType.SizeToCells);
+        }
+
+        GridArtifacts.UpdateLayout();
     }
 
     private CleanupOptions BuildOptions()
@@ -187,13 +218,6 @@ public partial class MainWindow : Window
         if (obj is not ArtifactItem item) return false;
         if (!_isReady) return true;
 
-        var search = TxtSearch.Text.Trim();
-        if (!string.IsNullOrEmpty(search) &&
-            !item.Location.Contains(search, StringComparison.OrdinalIgnoreCase) &&
-            !(item.Description?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) &&
-            !item.DisplayViewGroup.Contains(search, StringComparison.OrdinalIgnoreCase))
-            return false;
-
         if (_activeGroup == ArtifactViewGroup.All)
             return true;
 
@@ -205,14 +229,69 @@ public partial class MainWindow : Window
         if (!_isReady || LstCategories.SelectedItem is not CategoryFilterItem selected)
             return;
 
+        if (_isNetworkTab)
+        {
+            _activeNetworkGroup = selected.NetworkGroup;
+            NetworkView.SetCategoryFilter(_activeNetworkGroup);
+            return;
+        }
+
         _activeGroup = selected.Group;
         _filteredView.Refresh();
         UpdateCount();
     }
 
-    private void TxtSearch_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    private void MainTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_isReady) _filteredView.Refresh();
+        if (!_isReady) return;
+        _isNetworkTab = MainTabs.SelectedIndex == 1;
+        UsbBottomBar.Visibility = _isNetworkTab ? Visibility.Collapsed : Visibility.Visible;
+        TxtSubtitle.Text = _isNetworkTab
+            ? "Аудит и очистка сетевых следов"
+            : "Профессиональная очистка следов USB";
+        RefreshSidebarCategories();
+    }
+
+    private void NetworkView_CategoriesChanged(
+        NetworkAuditFilterGroup active,
+        IReadOnlyList<(NetworkAuditFilterGroup Group, string Label, int Count)> counts)
+    {
+        if (!_isNetworkTab) return;
+        _categories.Clear();
+        foreach (var (group, label, count) in counts)
+        {
+            _categories.Add(new CategoryFilterItem
+            {
+                NetworkGroup = group,
+                Label = $"{label} ({count})"
+            });
+        }
+        LstCategories.Items.Refresh();
+    }
+
+    private void RefreshSidebarCategories()
+    {
+        _isReady = false;
+        _categories.Clear();
+        if (_isNetworkTab)
+        {
+            foreach (var (group, label, count) in NetworkView.GetCategoryCounts())
+            {
+                _categories.Add(new CategoryFilterItem
+                {
+                    NetworkGroup = group,
+                    Label = $"{label} ({count})"
+                });
+            }
+            if (_categories.Count > 0)
+                LstCategories.SelectedIndex = 0;
+        }
+        else
+        {
+            InitCategories();
+            LstCategories.SelectedIndex = 0;
+        }
+        _isReady = true;
     }
 
     private void BtnSelectAll_Click(object sender, RoutedEventArgs e)
@@ -337,6 +416,7 @@ public partial class MainWindow : Window
         UpdateCategoryCounts();
         _filteredView.Refresh();
         UpdateCount();
+        ScheduleAutoFitGridColumns();
     }
 
     private void SelectCategory(ArtifactViewGroup group)
@@ -371,7 +451,8 @@ public partial class MainWindow : Window
 
     private sealed class CategoryFilterItem
     {
-        public required ArtifactViewGroup Group { get; init; }
+        public ArtifactViewGroup Group { get; init; } = ArtifactViewGroup.All;
+        public NetworkAuditFilterGroup NetworkGroup { get; init; } = NetworkAuditFilterGroup.All;
         public string Label { get; set; } = string.Empty;
     }
 }
