@@ -117,13 +117,29 @@
                     <DataGrid x:Name="GridArtifacts" Grid.Row="1" Margin="8,0,8,8"
                               AutoGenerateColumns="False" IsReadOnly="False"
                               CanUserAddRows="False" CanUserDeleteRows="False"
-                              SelectionMode="Extended">
+                              SelectionMode="Extended"
+                              ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                              ScrollViewer.VerticalScrollBarVisibility="Auto">
                         <DataGrid.Columns>
                             <DataGridCheckBoxColumn Header="✓" Binding="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" Width="36"/>
-                            <DataGridTextColumn Header="Раздел" Binding="{Binding DisplayViewGroup}" Width="140" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Тип" Binding="{Binding Type}" Width="80" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Расположение" Binding="{Binding Location}" Width="*" IsReadOnly="True"/>
-                            <DataGridTextColumn Header="Описание" Binding="{Binding Description}" Width="160" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Раздел" Binding="{Binding DisplayViewGroup}" Width="130" MinWidth="90" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Тип" Binding="{Binding Type}" Width="90" MinWidth="70" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Расположение" Binding="{Binding Location}" Width="520" MinWidth="280" IsReadOnly="True">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="TextTrimming" Value="None"/>
+                                        <Setter Property="TextWrapping" Value="NoWrap"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Описание" Binding="{Binding Description}" Width="220" MinWidth="120" IsReadOnly="True">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="TextTrimming" Value="None"/>
+                                        <Setter Property="TextWrapping" Value="Wrap"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
