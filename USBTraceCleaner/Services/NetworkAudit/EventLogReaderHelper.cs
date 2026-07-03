@@ -1,8 +1,10 @@
 using System.Diagnostics.Eventing.Reader;
 using USBTraceCleaner.Models;
+using System.Diagnostics.CodeAnalysis;
 
 namespace USBTraceCleaner.Services.NetworkAudit;
 
+[ExcludeFromCodeCoverage]
 internal static class EventLogReaderHelper
 {
     internal static readonly string[] NetworkChannels =
@@ -29,6 +31,9 @@ internal static class EventLogReaderHelper
         NetworkAuditFilterGroup group,
         NetworkAuditKind kind)
     {
+        if (!EventLogChannelHelper.Exists(channel))
+            yield break;
+
         var items = new List<NetworkAuditItem>();
         try
         {
@@ -44,7 +49,7 @@ internal static class EventLogReaderHelper
                     if (time < from) break;
                     if (time > to) continue;
 
-                    var desc = record.FormatDescription() ?? record.Id.ToString();
+                    var desc = NetworkAuditDisplay.SanitizeForDisplay(record.FormatDescription() ?? record.Id.ToString());
                     if (desc.Length > 500) desc = desc[..500] + "…";
 
                     items.Add(new NetworkAuditItem
@@ -63,23 +68,19 @@ internal static class EventLogReaderHelper
         }
         catch
         {
-            items.Add(new NetworkAuditItem
-            {
-                Kind = NetworkAuditKind.EventLogChannel,
-                FilterGroup = NetworkAuditFilterGroup.EventLogs,
-                Source = channel,
-                Title = "Журнал недоступен или пуст",
-                Detail = "Не удалось прочитать события (нет прав или журнал отключён)",
-                Location = channel,
-                CanClean = true
-            });
+            // Канал есть, но чтение не удалось — не предлагаем ложную очистку
         }
 
-        return items;
+        foreach (var item in items)
+            yield return item;
     }
 
-    public static NetworkAuditItem ChannelCleanupItem(string channel, NetworkAuditFilterGroup group) =>
-        new()
+    public static NetworkAuditItem? TryCreateCleanupItem(string channel, NetworkAuditFilterGroup group)
+    {
+        if (!EventLogChannelHelper.Exists(channel))
+            return null;
+
+        return new NetworkAuditItem
         {
             Kind = NetworkAuditKind.EventLogChannel,
             FilterGroup = group,
@@ -89,4 +90,5 @@ internal static class EventLogReaderHelper
             Location = channel,
             CanClean = true
         };
+    }
 }

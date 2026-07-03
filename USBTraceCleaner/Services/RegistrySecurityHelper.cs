@@ -2,12 +2,11 @@ using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using Microsoft.Win32;
+using System.Diagnostics.CodeAnalysis;
 
 namespace USBTraceCleaner.Services;
 
-/// <summary>
-/// Захват владения ключами реестра (TrustedInstaller/SYSTEM) перед удалением.
-/// </summary>
+[ExcludeFromCodeCoverage]
 public static class RegistrySecurityHelper
 {
     private const int TokenAdjustPrivileges = 0x0020;

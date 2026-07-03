@@ -1,15 +1,19 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using System.Windows.Threading;
+using System.Windows.Input;
 using USBTraceCleaner.Models;
 using USBTraceCleaner.Services;
+using USBTraceCleaner.Services.Report;
 using USBTraceCleaner.Views;
+using System.Diagnostics.CodeAnalysis;
 
 namespace USBTraceCleaner;
 
+[ExcludeFromCodeCoverage]
 public partial class MainWindow : Window
 {
     private readonly ObservableCollection<ArtifactItem> _allItems = [];
@@ -17,11 +21,19 @@ public partial class MainWindow : Window
     private readonly ICollectionView _filteredView;
     private readonly ArtifactScanner _scanner = new();
     private readonly ArtifactCleaner _cleaner = new();
+    private readonly StringBuilder _log = new();
     private CancellationTokenSource? _cts;
     private bool _isReady;
+    private bool _operationInProgress;
     private bool _isNetworkTab;
+    private bool _isOtherUsbTab;
     private ArtifactViewGroup _activeGroup = ArtifactViewGroup.All;
     private NetworkAuditFilterGroup _activeNetworkGroup = NetworkAuditFilterGroup.All;
+    private ReportOperationType _lastUsbOperation = ReportOperationType.Scan;
+    private CleanupResult? _lastUsbCleanResult;
+    private CleanupOptions? _lastUsbOptions;
+    private int _lastGhostRemoved;
+    private int _lastGhostFailed;
 
     public MainWindow()
     {
@@ -43,7 +55,14 @@ public partial class MainWindow : Window
         if (!AdminHelper.IsAdministrator())
             TxtAdminWarning.Visibility = Visibility.Visible;
 
-        AppendLog("Очистка следов USB v1.1 — Windows 10/11");
+        NetworkView.OperationBusyChanged += NetworkSetBusy;
+        OtherUsbView.OperationBusyChanged += OtherUsbSetBusy;
+        OtherUsbView.CountChanged += _ => RefreshOtherUsbSidebar();
+
+        TxtAppVersion.Text = $"версия {AppInfo.Version}";
+
+        AppendLog($"Очистка следов USB {AppInfo.VersionLabel} — Windows 10/11");
+        AppendLog("Вкладка «Другие USB-следы» — хабы, камеры, DeviceMigration (не флешки).");
         AppendLog("Перед очисткой отключите все USB-накопители.");
         AppendLog("Слева — категории; «Призраки / дубликаты» — лишние записи PnP.");
         AppendLog("«Сканировать» — показать следы. «Очистить» — удалить выбранное.");
@@ -51,17 +70,32 @@ public partial class MainWindow : Window
         AppendLog("");
     }
 
-    private void InitCategories()
+    private void InitCategories() => RebuildUsbCategories(preserveSelection: false);
+
+    private void RebuildUsbCategories(bool preserveSelection = true)
     {
+        var prevGroup = _activeGroup;
+        var wasReady = _isReady;
+        _isReady = false;
+
         _categories.Clear();
         foreach (var group in ArtifactClassifier.OrderedGroups)
         {
             _categories.Add(new CategoryFilterItem
             {
                 Group = group,
-                Label = FormatCategoryLabel(group, 0)
+                Name = ArtifactClassifier.GetGroupLabel(group),
+                Count = CountInGroup(group)
             });
         }
+
+        if (preserveSelection)
+        {
+            var idx = _categories.ToList().FindIndex(c => c.Group == prevGroup);
+            LstCategories.SelectedIndex = idx >= 0 ? idx : 0;
+        }
+
+        _isReady = wasReady;
     }
 
     private async void BtnScan_Click(object sender, RoutedEventArgs e) => await RunOperation(scanOnly: true);
@@ -92,6 +126,7 @@ public partial class MainWindow : Window
         try
         {
             var options = BuildOptions();
+            _lastUsbOptions = options;
 
             AppendLog($"--- {(scanOnly ? "Сканирование" : "Очистка")} ---");
 
@@ -110,7 +145,9 @@ public partial class MainWindow : Window
 
             if (!scanOnly)
             {
+                _lastUsbOperation = ReportOperationType.Clean;
                 var result = await _cleaner.ExecuteAsync(_allItems, options, progress, _cts.Token);
+                _lastUsbCleanResult = result;
                 AppendLog(result.Log);
                 LoadScanResults(_allItems.ToList());
                 UpdateCategoryCounts();
@@ -136,6 +173,8 @@ public partial class MainWindow : Window
             }
             else
             {
+                _lastUsbOperation = ReportOperationType.Scan;
+                _lastUsbCleanResult = null;
                 var storageTraces = CountInGroup(ArtifactViewGroup.UsbStorage);
                 AppendLog($"Сканирование завершено. Всего: {_allItems.Count}, USB-накопителей: {storageTraces}");
                 TxtPhase.Text = "Сканирование завершено";
@@ -165,33 +204,6 @@ public partial class MainWindow : Window
         UpdateCategoryCounts();
         _filteredView.Refresh();
         UpdateCount();
-        ScheduleAutoFitGridColumns();
-    }
-
-    private void ScheduleAutoFitGridColumns()
-    {
-        Dispatcher.BeginInvoke(AutoFitGridColumns, DispatcherPriority.Loaded);
-    }
-
-    private void AutoFitGridColumns()
-    {
-        if (GridArtifacts.Columns.Count == 0)
-            return;
-
-        GridArtifacts.UpdateLayout();
-
-        foreach (var column in GridArtifacts.Columns)
-        {
-            if (column is DataGridCheckBoxColumn)
-            {
-                column.Width = new DataGridLength(40);
-                continue;
-            }
-
-            column.Width = new DataGridLength(1, DataGridLengthUnitType.SizeToCells);
-        }
-
-        GridArtifacts.UpdateLayout();
     }
 
     private CleanupOptions BuildOptions()
@@ -226,7 +238,7 @@ public partial class MainWindow : Window
 
     private void LstCategories_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
-        if (!_isReady || LstCategories.SelectedItem is not CategoryFilterItem selected)
+        if (!_isReady || _operationInProgress || LstCategories.SelectedItem is not CategoryFilterItem selected)
             return;
 
         if (_isNetworkTab)
@@ -236,6 +248,9 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (_isOtherUsbTab)
+            return;
+
         _activeGroup = selected.Group;
         _filteredView.Refresh();
         UpdateCount();
@@ -243,12 +258,17 @@ public partial class MainWindow : Window
 
     private void MainTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!_isReady) return;
+        if (!_isReady || _operationInProgress) return;
         _isNetworkTab = MainTabs.SelectedIndex == 1;
-        UsbBottomBar.Visibility = _isNetworkTab ? Visibility.Collapsed : Visibility.Visible;
+        _isOtherUsbTab = MainTabs.SelectedIndex == 2;
+        UsbBottomBar.Visibility = _isNetworkTab || _isOtherUsbTab ? Visibility.Collapsed : Visibility.Visible;
+        NetworkBottomBar.Visibility = _isNetworkTab ? Visibility.Visible : Visibility.Collapsed;
+        OtherUsbBottomBar.Visibility = _isOtherUsbTab ? Visibility.Visible : Visibility.Collapsed;
         TxtSubtitle.Text = _isNetworkTab
             ? "Аудит и очистка сетевых следов"
-            : "Профессиональная очистка следов USB";
+            : _isOtherUsbTab
+                ? "USB не-накопители: как «Другие следы» в USBDetector"
+                : "Профессиональная очистка следов USB";
         RefreshSidebarCategories();
     }
 
@@ -257,16 +277,27 @@ public partial class MainWindow : Window
         IReadOnlyList<(NetworkAuditFilterGroup Group, string Label, int Count)> counts)
     {
         if (!_isNetworkTab) return;
+
+        var prevGroup = _activeNetworkGroup;
+        var wasReady = _isReady;
+        _isReady = false;
+
         _categories.Clear();
         foreach (var (group, label, count) in counts)
         {
             _categories.Add(new CategoryFilterItem
             {
                 NetworkGroup = group,
-                Label = $"{label} ({count})"
+                Name = label,
+                Count = count
             });
         }
-        LstCategories.Items.Refresh();
+
+        var idx = _categories.ToList().FindIndex(c => c.NetworkGroup == prevGroup);
+        LstCategories.SelectedIndex = idx >= 0 ? idx : 0;
+        _activeNetworkGroup = prevGroup;
+
+        _isReady = wasReady;
     }
 
     private void RefreshSidebarCategories()
@@ -280,16 +311,27 @@ public partial class MainWindow : Window
                 _categories.Add(new CategoryFilterItem
                 {
                     NetworkGroup = group,
-                    Label = $"{label} ({count})"
+                    Name = label,
+                    Count = count
                 });
             }
             if (_categories.Count > 0)
                 LstCategories.SelectedIndex = 0;
         }
+        else if (_isOtherUsbTab)
+        {
+            _categories.Add(new CategoryFilterItem
+            {
+                Name = "Все",
+                Count = OtherUsbView.ItemCount
+            });
+            LstCategories.SelectedIndex = 0;
+        }
         else
         {
-            InitCategories();
-            LstCategories.SelectedIndex = 0;
+            RebuildUsbCategories();
+            if (_categories.Count > 0 && LstCategories.SelectedIndex < 0)
+                LstCategories.SelectedIndex = 0;
         }
         _isReady = true;
     }
@@ -310,20 +352,14 @@ public partial class MainWindow : Window
         UpdateCount();
     }
 
-    private void UpdateCategoryCounts()
-    {
-        foreach (var cat in _categories)
-            cat.Label = FormatCategoryLabel(cat.Group, CountInGroup(cat.Group));
-        LstCategories.Items.Refresh();
-    }
+    private void UpdateCategoryCounts() => RebuildUsbCategories();
 
     private int CountInGroup(ArtifactViewGroup group) =>
         group == ArtifactViewGroup.All
             ? _allItems.Count
             : _allItems.Count(i => i.ViewGroup == group);
 
-    private static string FormatCategoryLabel(ArtifactViewGroup group, int count) =>
-        $"{ArtifactClassifier.GetGroupLabel(group)} ({count})";
+    private void ArtifactCheck_Click(object sender, RoutedEventArgs e) => UpdateCount();
 
     private void UpdateCount()
     {
@@ -388,6 +424,15 @@ public partial class MainWindow : Window
             AppendLog("--- Удаление призраков и дубликатов ---");
             var result = await Task.Run(() => PnPGhostScanner.RemoveSelected(_allItems, AppendLog));
             MergeGhostScanResults(PnPGhostScanner.Scan());
+            _lastUsbOperation = ReportOperationType.GhostClean;
+            _lastGhostRemoved = result.Removed;
+            _lastGhostFailed = result.Failed;
+            _lastUsbCleanResult = new CleanupResult
+            {
+                ItemsProcessed = result.Removed,
+                FailedCount = result.Failed,
+                Success = result.Failed == 0
+            };
             AppendLog($"Удалено: {result.Removed}, ошибок: {result.Failed}");
 
             MessageBox.Show(
@@ -416,7 +461,104 @@ public partial class MainWindow : Window
         UpdateCategoryCounts();
         _filteredView.Refresh();
         UpdateCount();
-        ScheduleAutoFitGridColumns();
+    }
+
+    private void NetworkHelp_Click(object sender, RoutedEventArgs e) => NetworkView.ShowHelp();
+
+    private void NetworkSelectAll_Click(object sender, RoutedEventArgs e) => NetworkView.SelectAll();
+
+    private void NetworkDeselect_Click(object sender, RoutedEventArgs e) => NetworkView.DeselectAll();
+
+    private void BtnUsbLog_Click(object sender, RoutedEventArgs e) =>
+        LogWindow.ShowDialog(this, "Журнал — USB", _log.ToString());
+
+    private void BtnUsbReport_Click(object sender, RoutedEventArgs e)
+    {
+        if (_allItems.Count == 0 && _log.Length == 0)
+        {
+            MessageBox.Show("Сначала выполните сканирование или очистку.", "Отчёт PDF",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var request = ReportExportService.BuildUsbReport(
+            _lastUsbOperation,
+            _allItems,
+            _log.ToString(),
+            _lastUsbOptions,
+            _lastUsbCleanResult);
+
+        ReportExportService.TrySavePdf(request, this);
+    }
+
+    private void RefreshOtherUsbSidebar()
+    {
+        if (!_isOtherUsbTab) return;
+        RefreshSidebarCategories();
+    }
+
+    private void BtnOtherUsbLog_Click(object sender, RoutedEventArgs e) =>
+        LogWindow.ShowDialog(this, "Журнал — другие USB-следы", OtherUsbView.GetLogText());
+
+    private async void OtherUsbScan_Click(object sender, RoutedEventArgs e) => await OtherUsbView.ScanAsync();
+
+    private async void OtherUsbClean_Click(object sender, RoutedEventArgs e) => await OtherUsbView.CleanSelectedAsync(this);
+
+    private void OtherUsbSelectAll_Click(object sender, RoutedEventArgs e) => OtherUsbView.SelectAll();
+
+    private void OtherUsbDeselect_Click(object sender, RoutedEventArgs e) => OtherUsbView.DeselectAll();
+
+    private void OtherUsbSetBusy(bool busy)
+    {
+        SetOperationChrome(busy);
+        BtnOtherUsbScan.IsEnabled = !busy;
+        BtnOtherUsbClean.IsEnabled = !busy;
+        BtnOtherUsbSelect.IsEnabled = !busy;
+        BtnOtherUsbDeselect.IsEnabled = !busy;
+        BtnOtherUsbLog.IsEnabled = !busy;
+    }
+
+    private void BtnNetworkLog_Click(object sender, RoutedEventArgs e) =>
+        LogWindow.ShowDialog(this, "Журнал — аудит сети", NetworkView.GetLogText());
+
+    private void BtnNetworkSummary_Click(object sender, RoutedEventArgs e) =>
+        NetworkView.ShowSummaryDialog(this);
+
+    private void BtnNetworkReport_Click(object sender, RoutedEventArgs e) => NetworkView.ExportPdfReport(this);
+
+    private async void NetworkScan_Click(object sender, RoutedEventArgs e) => await NetworkView.ScanAsync();
+
+    private async void NetworkClean_Click(object sender, RoutedEventArgs e) => await NetworkView.CleanAsync();
+
+    private void NetworkSetBusy(bool busy)
+    {
+        SetOperationChrome(busy);
+        BtnNetworkHelp.IsEnabled = !busy;
+        BtnNetworkSelect.IsEnabled = !busy;
+        BtnNetworkDeselect.IsEnabled = !busy;
+        BtnNetworkScan.IsEnabled = !busy;
+        BtnNetworkClean.IsEnabled = !busy;
+        BtnNetworkLog.IsEnabled = !busy;
+        BtnNetworkReport.IsEnabled = !busy;
+        BtnNetworkSummary.IsEnabled = !busy;
+    }
+
+    private void SetOperationChrome(bool busy)
+    {
+        _operationInProgress = busy;
+        Mouse.OverrideCursor = busy ? Cursors.Wait : null;
+    }
+
+    private void SetBusy(bool busy)
+    {
+        SetOperationChrome(busy);
+        BtnScan.IsEnabled = !busy;
+        BtnClean.IsEnabled = !busy;
+        BtnFixDuplicates.IsEnabled = !busy;
+        BtnSelectAll.IsEnabled = !busy;
+        BtnDeselectAll.IsEnabled = !busy;
+        BtnUsbLog.IsEnabled = !busy;
+        BtnUsbReport.IsEnabled = !busy;
     }
 
     private void SelectCategory(ArtifactViewGroup group)
@@ -434,25 +576,14 @@ public partial class MainWindow : Window
 
     private void AppendLog(string line)
     {
-        TxtLog.AppendText(line + Environment.NewLine);
-        TxtLog.ScrollToEnd();
-    }
-
-    private void SetBusy(bool busy)
-    {
-        BtnScan.IsEnabled = !busy;
-        BtnClean.IsEnabled = !busy;
-        BtnFixDuplicates.IsEnabled = !busy;
-        BtnSelectAll.IsEnabled = !busy;
-        BtnDeselectAll.IsEnabled = !busy;
-        LstCategories.IsEnabled = !busy;
-        Cursor = busy ? System.Windows.Input.Cursors.Wait : System.Windows.Input.Cursors.Arrow;
+        _log.AppendLine(line);
     }
 
     private sealed class CategoryFilterItem
     {
         public ArtifactViewGroup Group { get; init; } = ArtifactViewGroup.All;
         public NetworkAuditFilterGroup NetworkGroup { get; init; } = NetworkAuditFilterGroup.All;
-        public string Label { get; set; } = string.Empty;
+        public string Name { get; init; } = string.Empty;
+        public int Count { get; init; }
     }
 }

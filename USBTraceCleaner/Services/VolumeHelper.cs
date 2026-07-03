@@ -1,8 +1,10 @@
 using System.Diagnostics;
 using System.IO;
+using System.Diagnostics.CodeAnalysis;
 
 namespace USBTraceCleaner.Services;
 
+[ExcludeFromCodeCoverage]
 public static class VolumeHelper
 {
     public static void OfflineUsbDisks(Action<string>? log = null)

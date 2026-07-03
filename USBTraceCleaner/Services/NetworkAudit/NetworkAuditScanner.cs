@@ -1,7 +1,9 @@
 using USBTraceCleaner.Models;
+using System.Diagnostics.CodeAnalysis;
 
 namespace USBTraceCleaner.Services.NetworkAudit;
 
+[ExcludeFromCodeCoverage]
 public sealed class NetworkAuditScanner
 {
     private readonly RouterAuditScanner _router = new();
@@ -53,10 +55,22 @@ public sealed class NetworkAuditScanner
         if (options.ScanRouter)
             AddPhase("Роутер и LAN…", _router.Scan(options));
 
-        return items
+        var deduped = items
             .GroupBy(i => $"{i.Kind}|{i.Location}|{i.Title}")
             .Select(g => g.First())
-            .OrderByDescending(i => i.EventTime ?? DateTime.MinValue)
+            .ToList();
+
+        return FinalizeScan(deduped, options);
+    }
+
+    public static IReadOnlyList<NetworkAuditItem> FinalizeScan(
+        IReadOnlyList<NetworkAuditItem> items,
+        NetworkAuditOptions options)
+    {
+        NetworkAuditClassifier.ApplyWhitelist(items, options.Whitelist);
+        return items
+            .OrderByDescending(i => i.AuthorizationStatus == NetworkAuthorizationStatus.Unknown)
+            .ThenByDescending(i => i.EventTime ?? DateTime.MinValue)
             .ThenBy(i => i.DisplayGroup)
             .ThenBy(i => i.Title)
             .ToList();

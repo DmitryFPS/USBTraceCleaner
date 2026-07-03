@@ -2,8 +2,11 @@ using System.IO;
 using Microsoft.Win32;
 using USBTraceCleaner.Models;
 
+using System.Diagnostics.CodeAnalysis;
+
 namespace USBTraceCleaner.Services.NetworkAudit;
 
+[ExcludeFromCodeCoverage]
 internal static class WindowsNetworkScanner
 {
     public static IEnumerable<NetworkAuditItem> ScanDns()
@@ -47,7 +50,11 @@ internal static class WindowsNetworkScanner
             yield return item;
 
         foreach (var item in ScanRegistryKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Signatures\Unmanaged",
-                     NetworkAuditKind.RegistryTrace, NetworkAuditFilterGroup.Registry, "Подпись сети", false))
+                     NetworkAuditKind.RegistryTrace, NetworkAuditFilterGroup.Registry, "Подпись VPN/сети", true))
+            yield return item;
+
+        foreach (var item in ScanRegistryKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Signatures\Managed",
+                     NetworkAuditKind.RegistryTrace, NetworkAuditFilterGroup.Registry, "Подпись (Managed)", true))
             yield return item;
 
         foreach (var item in ScanRegistryKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Nla\Cache",
@@ -110,7 +117,7 @@ internal static class WindowsNetworkScanner
                     Title = $"WLAN интерфейс: {desc}",
                     Detail = $"GUID: {sub}",
                     Location = sub,
-                    CanClean = false
+                    CanClean = true
                 });
             }
         }, RegistryHive.LocalMachine, @"SYSTEM\CurrentControlSet\Services\WlanSvc\Interfaces");
@@ -162,6 +169,7 @@ internal static class WindowsNetworkScanner
         var hosts = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"drivers\etc\hosts");
         if (!File.Exists(hosts)) yield break;
         var lines = File.ReadAllLines(hosts).Where(l => !l.TrimStart().StartsWith('#') && l.Trim().Length > 0).ToList();
+        if (lines.Count == 0) yield break;
         yield return new NetworkAuditItem
         {
             Kind = NetworkAuditKind.HostsFile,
@@ -170,7 +178,7 @@ internal static class WindowsNetworkScanner
             Title = $"Файл hosts ({lines.Count} записей)",
             Detail = Truncate(string.Join(" | ", lines), 500),
             Location = hosts,
-            CanClean = false
+            CanClean = true
         };
     }
 
@@ -187,7 +195,7 @@ internal static class WindowsNetworkScanner
             Title = "История сетевой активности приложений (SRU)",
             Detail = $"Размер: {info.Length / 1024} KB | Изменён: {info.LastWriteTime:dd.MM.yyyy HH:mm}",
             Location = sru,
-            CanClean = false
+            CanClean = true
         };
     }
 
@@ -242,7 +250,9 @@ internal static class WindowsNetworkScanner
             foreach (var item in EventLogReaderHelper.ReadEvents(channel, options.DateFrom, options.DateTo, group, kind))
                 yield return item;
 
-            yield return EventLogReaderHelper.ChannelCleanupItem(channel, group);
+            var cleanup = EventLogReaderHelper.TryCreateCleanupItem(channel, group);
+            if (cleanup != null)
+                yield return cleanup;
         }
     }
 
@@ -272,10 +282,40 @@ internal static class WindowsNetworkScanner
             FilterGroup = NetworkAuditFilterGroup.Cache,
             Source = "nbtstat -c",
             Title = "NetBIOS кэш имён в сети",
-            Detail = Truncate(output, 800),
+            Detail = FormatNetbiosCache(output),
             Location = "__netbios__",
             CanClean = true
         };
+    }
+
+    private static string FormatNetbiosCache(string output)
+    {
+        var entries = new List<string>();
+        foreach (var rawLine in output.Split('\n'))
+        {
+            var line = rawLine.Trim();
+            if (line.Length == 0 || line.All(c => c is '-' or '='))
+                continue;
+
+            if (line.Contains("IP", StringComparison.OrdinalIgnoreCase) &&
+                line.Contains('[') && line.Contains(']'))
+            {
+                entries.Add(line);
+                continue;
+            }
+
+            if (line.Contains("NetBIOS", StringComparison.OrdinalIgnoreCase) ||
+                line.Contains("Имя", StringComparison.OrdinalIgnoreCase))
+            {
+                entries.Add(line);
+            }
+        }
+
+        var text = entries.Count > 0
+            ? string.Join(" | ", entries)
+            : output;
+
+        return Truncate(text, 800);
     }
 
     public static IEnumerable<NetworkAuditItem> ScanWlansvcFiles()

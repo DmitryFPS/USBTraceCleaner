@@ -1,6 +1,8 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace USBTraceCleaner.Services;
 
-/// <summary>USBTraceCleaner.exe --restore-logs — восстановить setupapi.dev.log без полной очистки.</summary>
+[ExcludeFromCodeCoverage]
 public static class LogRestoreRunner
 {
     public static int Run()

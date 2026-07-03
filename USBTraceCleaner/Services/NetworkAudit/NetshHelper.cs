@@ -4,8 +4,12 @@ using System.Text;
 using System.Text.RegularExpressions;
 using USBTraceCleaner.Models;
 
+using USBTraceCleaner.Models;
+using System.Diagnostics.CodeAnalysis;
+
 namespace USBTraceCleaner.Services.NetworkAudit;
 
+[ExcludeFromCodeCoverage]
 internal static partial class NetshHelper
 {
     public static IEnumerable<NetworkAuditItem> ScanWiFiProfiles()

@@ -3,56 +3,57 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="clr-namespace:USBTraceCleaner.Views"
         Title="USB Trace Cleaner"
-        Height="780" Width="1140"
-        MinHeight="600" MinWidth="920"
+        Height="800" Width="1180"
+        MinHeight="640" MinWidth="960"
         WindowStartupLocation="CenterScreen"
         Icon="pack://application:,,,/Assets/app.ico"
         Background="{StaticResource BgBrush}"
         FontFamily="Segoe UI">
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="270"/>
+            <ColumnDefinition Width="260"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- Боковая панель -->
+        <!-- Sidebar -->
         <Border Grid.Column="0" Background="#0F172A">
-            <DockPanel Margin="18">
-                <StackPanel DockPanel.Dock="Top" Margin="0,4,0,22">
-                    <Border Background="#1D4ED8" CornerRadius="7" Padding="9,4"
-                            HorizontalAlignment="Left" Margin="0,0,0,12">
-                        <TextBlock Text="PRO" Foreground="White" FontSize="11" FontWeight="Bold"/>
+            <DockPanel Margin="16">
+                <StackPanel DockPanel.Dock="Top" Margin="0,4,0,20">
+                    <Border Background="#1D4ED8" CornerRadius="6" Padding="8,3"
+                            HorizontalAlignment="Left" Margin="0,0,0,10">
+                        <TextBlock Text="PRO" Foreground="White" FontSize="10" FontWeight="Bold"/>
                     </Border>
                     <TextBlock Text="USB Trace Cleaner" Foreground="White"
-                               FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                               FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap"/>
                     <TextBlock x:Name="TxtSubtitle"
                                Text="Профессиональная очистка следов USB"
-                               Foreground="#94A3B8" FontSize="12.5" Margin="0,8,0,0"
-                               TextWrapping="Wrap"/>
+                               Foreground="#94A3B8" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap"/>
                     <TextBlock x:Name="TxtAdminWarning" Foreground="#FCA5A5"
-                               FontWeight="SemiBold" FontSize="12" Margin="0,12,0,0"
+                               FontWeight="SemiBold" FontSize="11" Margin="0,10,0,0"
                                Visibility="Collapsed" Text="Запустите от имени администратора"/>
                 </StackPanel>
 
                 <Border DockPanel.Dock="Bottom" Background="#111C2F" BorderBrush="#243247"
-                        BorderThickness="1" CornerRadius="10" Padding="14" Margin="0,18,0,0">
+                        BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,16,0,0">
                     <StackPanel>
                         <TextBlock x:Name="TxtOsBadge" Text="Windows 10/11"
-                                   Foreground="#E2E8F0" FontSize="12" FontWeight="SemiBold"/>
-                        <TextBlock Text="версия 1.1" Foreground="#94A3B8"
-                                   FontSize="11" Margin="0,3,0,0"/>
+                                   Foreground="#E2E8F0" FontSize="11" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="TxtAppVersion" Text="версия 1.4.1" Foreground="#94A3B8" FontSize="10" Margin="0,2,0,0"/>
                     </StackPanel>
                 </Border>
 
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="Категории"
-                               Foreground="#64748B" FontWeight="SemiBold" FontSize="11"
+                    <TextBlock DockPanel.Dock="Top" Text="КАТЕГОРИИ"
+                               Foreground="#64748B" FontWeight="SemiBold" FontSize="10"
                                Margin="4,0,0,8"/>
                     <ListBox x:Name="LstCategories" Style="{StaticResource CategoryListBox}"
                              ItemContainerStyle="{StaticResource CategoryListBoxItem}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding Label}" TextWrapping="Wrap"/>
+                                <TextBlock TextWrapping="Wrap">
+                                    <Run Text="{Binding Name}"/>
+                                    <Run Text="{Binding Count, StringFormat=' ({0})'}"/>
+                                </TextBlock>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
@@ -60,169 +61,242 @@
             </DockPanel>
         </Border>
 
-        <!-- Рабочая область -->
-        <TabControl x:Name="MainTabs" Grid.Column="1" Background="Transparent" BorderThickness="0"
-                    SelectionChanged="MainTabs_SelectionChanged">
-            <TabItem Header="USB">
-        <Grid Margin="22,18,22,18">
+        <!-- Main -->
+        <Grid Grid.Column="1">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="110"/>
             </Grid.RowDefinitions>
 
-            <StackPanel Grid.Row="0" Margin="0,0,0,14">
-                <TextBlock Text="Очистка следов USB" FontSize="28" FontWeight="SemiBold"
-                           Foreground="{StaticResource TextPrimaryBrush}"/>
-                <TextBlock Text="Сканирование, выборочная очистка и удаление призрачных PnP-записей"
-                           Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"
-                           Margin="0,5,0,0"/>
-            </StackPanel>
+            <TabControl x:Name="MainTabs" Grid.Row="0"
+                        Style="{StaticResource AppTabControl}"
+                        SelectionChanged="MainTabs_SelectionChanged">
+                <!-- USB -->
+                <TabItem Header="USB" Style="{StaticResource AppTabItem}">
+                    <DockPanel Margin="20,0,20,12" LastChildFill="True">
+                        <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+                            <TextBlock x:Name="TxtPhase" Text="" Foreground="{StaticResource TextSecondaryBrush}"
+                                       FontSize="11" Margin="0,0,0,4"/>
+                            <ProgressBar x:Name="ProgressBar" Height="4" Minimum="0" Maximum="100"
+                                         Background="#E2E8F0" Foreground="{StaticResource AccentBrush}"/>
+                        </StackPanel>
 
-            <!-- Настройки -->
-            <Border Grid.Row="1" Style="{StaticResource MainCard}" Margin="0,0,0,14" VerticalAlignment="Top">
-                <UniformGrid Columns="3" Margin="14">
-                    <Border Style="{StaticResource OptionCard}" Margin="0,0,6,0">
-                        <StackPanel>
-                            <TextBlock Text="БЭКАП" Style="{StaticResource SectionHeader}"/>
-                            <CheckBox x:Name="ChkBackup" Style="{StaticResource CompactCheckBox}"
-                                      Content="Сохранить .reg-бэкап" IsChecked="True"/>
-                            <CheckBox x:Name="ChkRestorePoint" Style="{StaticResource CompactCheckBox}"
-                                      Content="Точка восстановления" IsChecked="True"/>
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource OptionCard}" Margin="3,0">
-                        <StackPanel>
-                            <TextBlock Text="ПРИ ОЧИСТКЕ" Style="{StaticResource SectionHeader}"/>
-                            <CheckBox x:Name="ChkCloseExplorer" Style="{StaticResource CompactCheckBox}"
-                                      Content="Закрыть Проводник" IsChecked="True"/>
-                            <CheckBox x:Name="ChkReboot" Style="{StaticResource CompactCheckBox}"
-                                      Content="Перезагрузить Windows" IsChecked="True"/>
-                            <CheckBox x:Name="ChkMtp" Style="{StaticResource CompactCheckBox}"
-                                      Content="Очищать MTP (телефоны)" IsChecked="True"/>
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource OptionCard}" Margin="6,0,0,0">
-                        <StackPanel>
-                            <TextBlock Text="ЛОГИ И СЛЕДЫ EXPLORER" Style="{StaticResource SectionHeader}"/>
-                            <CheckBox x:Name="ChkScrubLogs" Style="{StaticResource CompactCheckBox}"
-                                      Content="Чистить логи (кроме setupapi.dev.log)" IsChecked="True"/>
-                            <CheckBox x:Name="ChkPreserveLogDates" Style="{StaticResource CompactCheckBox}"
-                                      Content="Сохранять даты логов" IsChecked="True"/>
-                            <CheckBox x:Name="ChkShellBags" Style="{StaticResource CompactCheckBox}"
-                                      Content="ShellBags" IsChecked="True"/>
-                            <CheckBox x:Name="ChkRecentLinks" Style="{StaticResource CompactCheckBox}"
-                                      Content="Recent / Jump Lists" IsChecked="True"/>
-                            <CheckBox x:Name="ChkBam" Style="{StaticResource CompactCheckBox}"
-                                      Content="BAM/DAM" IsChecked="True"/>
-                        </StackPanel>
-                    </Border>
-                </UniformGrid>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                                <TextBlock Text="Очистка следов USB" Style="{StaticResource PageTitle}"/>
+                                <TextBlock Text="Сканирование, выборочная очистка и удаление призрачных PnP-записей"
+                                           Style="{StaticResource PageSubtitle}"/>
+                            </StackPanel>
+
+                            <Border Grid.Row="1" Style="{StaticResource MainCard}" Margin="0,0,0,12">
+                                <UniformGrid Columns="3" Margin="12">
+                                    <Border Style="{StaticResource OptionCard}" Margin="0,0,6,0">
+                                        <StackPanel>
+                                            <TextBlock Text="БЭКАП" Style="{StaticResource SectionHeader}"/>
+                                            <CheckBox x:Name="ChkBackup" Style="{StaticResource CompactCheckBox}"
+                                                      Content="Сохранить .reg-бэкап" IsChecked="True"/>
+                                            <CheckBox x:Name="ChkRestorePoint" Style="{StaticResource CompactCheckBox}"
+                                                      Content="Точка восстановления" IsChecked="True"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource OptionCard}" Margin="3,0">
+                                        <StackPanel>
+                                            <TextBlock Text="ПРИ ОЧИСТКЕ" Style="{StaticResource SectionHeader}"/>
+                                            <CheckBox x:Name="ChkCloseExplorer" Style="{StaticResource CompactCheckBox}"
+                                                      Content="Закрыть Проводник" IsChecked="True"/>
+                                            <CheckBox x:Name="ChkReboot" Style="{StaticResource CompactCheckBox}"
+                                                      Content="Перезагрузить Windows" IsChecked="True"/>
+                                            <CheckBox x:Name="ChkMtp" Style="{StaticResource CompactCheckBox}"
+                                                      Content="Очищать MTP (телефоны)" IsChecked="True"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource OptionCard}" Margin="6,0,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="ЛОГИ И СЛЕДЫ EXPLORER" Style="{StaticResource SectionHeader}"/>
+                                            <CheckBox x:Name="ChkScrubLogs" Style="{StaticResource CompactCheckBox}"
+                                                      Content="Чистить логи (кроме setupapi.dev.log)" IsChecked="True"/>
+                                            <CheckBox x:Name="ChkPreserveLogDates" Style="{StaticResource CompactCheckBox}"
+                                                      Content="Сохранять даты логов" IsChecked="True"/>
+                                            <CheckBox x:Name="ChkShellBags" Style="{StaticResource CompactCheckBox}"
+                                                      Content="ShellBags" IsChecked="True"/>
+                                            <CheckBox x:Name="ChkRecentLinks" Style="{StaticResource CompactCheckBox}"
+                                                      Content="Recent / Jump Lists" IsChecked="True"/>
+                                            <CheckBox x:Name="ChkBam" Style="{StaticResource CompactCheckBox}"
+                                                      Content="BAM/DAM" IsChecked="True"/>
+                                        </StackPanel>
+                                    </Border>
+                                </UniformGrid>
+                            </Border>
+
+                            <Border Grid.Row="2" Style="{StaticResource MainCard}" MinHeight="180">
+                                <DockPanel LastChildFill="True">
+                                    <Border DockPanel.Dock="Top" Background="#F8FAFC"
+                                            BorderBrush="{StaticResource BorderBrushModern}"
+                                            BorderThickness="0,0,0,1" Padding="14,10">
+                                        <TextBlock x:Name="TxtFoundCount" Text="Найдено: 0"
+                                                   FontWeight="SemiBold" FontSize="13"/>
+                                    </Border>
+                                    <DataGrid x:Name="GridArtifacts"
+                                              Style="{StaticResource ResultsDataGrid}"
+                                              CellStyle="{StaticResource ResultsDataGridCell}"
+                                              AutoGenerateColumns="False" IsReadOnly="False"
+                                              CanUserAddRows="False" CanUserDeleteRows="False"
+                                              SelectionMode="Extended">
+                                        <DataGrid.Columns>
+                                            <DataGridTemplateColumn Header="✓" Width="44"
+                                                                    CellStyle="{StaticResource ResultsDataGridCheckCell}">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <CheckBox Style="{StaticResource GridCheckBox}"
+                                                                  IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}"
+                                                                  Click="ArtifactCheck_Click"/>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                            <DataGridTextColumn Header="Раздел" Binding="{Binding DisplayViewGroup}" IsReadOnly="True" Width="170">
+                                                <DataGridTextColumn.ElementStyle>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
+                                                </DataGridTextColumn.ElementStyle>
+                                            </DataGridTextColumn>
+                                            <DataGridTextColumn Header="Тип" Binding="{Binding Type}" IsReadOnly="True" Width="130">
+                                                <DataGridTextColumn.ElementStyle>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
+                                                </DataGridTextColumn.ElementStyle>
+                                            </DataGridTextColumn>
+                                            <DataGridTextColumn Header="Расположение" Binding="{Binding Location}" IsReadOnly="True" Width="*">
+                                                <DataGridTextColumn.ElementStyle>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
+                                                </DataGridTextColumn.ElementStyle>
+                                            </DataGridTextColumn>
+                                            <DataGridTextColumn Header="Описание" Binding="{Binding Description}" IsReadOnly="True" Width="220">
+                                                <DataGridTextColumn.ElementStyle>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
+                                                </DataGridTextColumn.ElementStyle>
+                                            </DataGridTextColumn>
+                                            <DataGridTextColumn Header="VID" Binding="{Binding DisplayVid}" IsReadOnly="True" Width="60">
+                                                <DataGridTextColumn.ElementStyle>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
+                                                </DataGridTextColumn.ElementStyle>
+                                            </DataGridTextColumn>
+                                            <DataGridTextColumn Header="PID" Binding="{Binding DisplayPid}" IsReadOnly="True" Width="60">
+                                                <DataGridTextColumn.ElementStyle>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
+                                                </DataGridTextColumn.ElementStyle>
+                                            </DataGridTextColumn>
+                                            <DataGridTextColumn Header="Производитель" Binding="{Binding DisplayManufacturer}" IsReadOnly="True" Width="170">
+                                                <DataGridTextColumn.ElementStyle>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
+                                                </DataGridTextColumn.ElementStyle>
+                                            </DataGridTextColumn>
+                                            <DataGridTextColumn Header="Модель" Binding="{Binding DisplayModel}" IsReadOnly="True" Width="170">
+                                                <DataGridTextColumn.ElementStyle>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
+                                                </DataGridTextColumn.ElementStyle>
+                                            </DataGridTextColumn>
+                                            <DataGridTextColumn Header="Первое подключение" Binding="{Binding DisplayFirstConnected}" IsReadOnly="True" Width="140">
+                                                <DataGridTextColumn.ElementStyle>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
+                                                </DataGridTextColumn.ElementStyle>
+                                            </DataGridTextColumn>
+                                            <DataGridTextColumn Header="Источник" Binding="{Binding DisplaySource}" IsReadOnly="True" Width="130">
+                                                <DataGridTextColumn.ElementStyle>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
+                                                </DataGridTextColumn.ElementStyle>
+                                            </DataGridTextColumn>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </DockPanel>
+                            </Border>
+                        </Grid>
+                    </DockPanel>
+                </TabItem>
+
+                <!-- Network -->
+                <TabItem Header="Аудит сети" Style="{StaticResource AppTabItem}">
+                    <views:NetworkAuditView x:Name="NetworkView" Margin="20,0,20,12"
+                                            CategoriesChanged="NetworkView_CategoriesChanged"/>
+                </TabItem>
+                <!-- Other USB traces -->
+                <TabItem Header="Другие USB-следы" Style="{StaticResource AppTabItem}">
+                    <views:OtherUsbTraceView x:Name="OtherUsbView" Margin="20,0,20,12"/>
+                </TabItem>
+            </TabControl>
+
+            <!-- USB actions -->
+            <Border x:Name="UsbBottomBar" Grid.Row="1" Style="{StaticResource ActionFooter}">
+                <DockPanel LastChildFill="True">
+                    <Button DockPanel.Dock="Left" x:Name="BtnUsbLog" Content="Журнал"
+                            Style="{StaticResource SecondaryButton}" MinWidth="96"
+                            Click="BtnUsbLog_Click"/>
+                    <Button DockPanel.Dock="Left" x:Name="BtnUsbReport" Content="Отчёт PDF"
+                            Style="{StaticResource SecondaryButton}" MinWidth="108" Margin="8,0,0,0"
+                            Click="BtnUsbReport_Click"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button x:Name="BtnSelectAll" Content="Выбрать все" Style="{StaticResource SecondaryButton}"
+                                MinWidth="108" Margin="0,0,8,0" Click="BtnSelectAll_Click"/>
+                        <Button x:Name="BtnDeselectAll" Content="Снять все" Style="{StaticResource SecondaryButton}"
+                                MinWidth="108" Margin="0,0,8,0" Click="BtnDeselectAll_Click"/>
+                        <Button x:Name="BtnScan" Content="Сканировать" Style="{StaticResource PrimaryButton}"
+                                MinWidth="124" Margin="0,0,8,0" Click="BtnScan_Click"/>
+                        <Button x:Name="BtnFixDuplicates" Content="Удалить призраки" Style="{StaticResource SecondaryButton}"
+                                MinWidth="140" Margin="0,0,8,0" Click="BtnFixDuplicates_Click"/>
+                        <Button x:Name="BtnClean" Content="Очистить" Style="{StaticResource DangerButton}"
+                                MinWidth="124" Click="BtnClean_Click"/>
+                    </StackPanel>
+                </DockPanel>
             </Border>
 
-            <!-- Таблица -->
-            <Border Grid.Row="2" Style="{StaticResource MainCard}" MinHeight="300">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-                    <Border Background="#F9FAFB" BorderBrush="{StaticResource BorderBrushModern}"
-                            BorderThickness="0,0,0,1" Padding="14,10">
-                        <TextBlock x:Name="TxtFoundCount" Text="Найдено: 0"
-                                   FontWeight="SemiBold" FontSize="13"
-                                   Foreground="{StaticResource TextPrimaryBrush}"
-                                   VerticalAlignment="Center"/>
-                    </Border>
-                    <DataGrid x:Name="GridArtifacts" Grid.Row="1" Margin="0"
-                                  AutoGenerateColumns="False" IsReadOnly="False"
-                                  CanUserAddRows="False" CanUserDeleteRows="False"
-                                  SelectionMode="Extended"
-                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                  GridLinesVisibility="All">
-                            <DataGrid.Columns>
-                                <DataGridCheckBoxColumn Header="✓" Binding="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" Width="42"/>
-                                <DataGridTextColumn x:Name="ColSection" Header="Раздел" Binding="{Binding DisplayViewGroup}" IsReadOnly="True">
-                                    <DataGridTextColumn.ElementStyle>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="TextTrimming" Value="None"/>
-                                            <Setter Property="TextWrapping" Value="NoWrap"/>
-                                        </Style>
-                                    </DataGridTextColumn.ElementStyle>
-                                </DataGridTextColumn>
-                                <DataGridTextColumn x:Name="ColType" Header="Тип" Binding="{Binding Type}" IsReadOnly="True">
-                                    <DataGridTextColumn.ElementStyle>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="TextTrimming" Value="None"/>
-                                            <Setter Property="TextWrapping" Value="NoWrap"/>
-                                        </Style>
-                                    </DataGridTextColumn.ElementStyle>
-                                </DataGridTextColumn>
-                                <DataGridTextColumn x:Name="ColLocation" Header="Расположение" Binding="{Binding Location}" IsReadOnly="True">
-                                    <DataGridTextColumn.ElementStyle>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="TextTrimming" Value="None"/>
-                                            <Setter Property="TextWrapping" Value="NoWrap"/>
-                                        </Style>
-                                    </DataGridTextColumn.ElementStyle>
-                                </DataGridTextColumn>
-                                <DataGridTextColumn x:Name="ColDescription" Header="Описание" Binding="{Binding Description}" IsReadOnly="True">
-                                    <DataGridTextColumn.ElementStyle>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="TextTrimming" Value="None"/>
-                                            <Setter Property="TextWrapping" Value="NoWrap"/>
-                                        </Style>
-                                    </DataGridTextColumn.ElementStyle>
-                                </DataGridTextColumn>
-                            </DataGrid.Columns>
-                        </DataGrid>
-                </Grid>
+            <!-- Network actions -->
+            <Border x:Name="NetworkBottomBar" Grid.Row="1" Style="{StaticResource ActionFooter}" Visibility="Collapsed">
+                <DockPanel LastChildFill="True">
+                    <Button DockPanel.Dock="Left" x:Name="BtnNetworkLog" Content="Журнал"
+                            Style="{StaticResource SecondaryButton}" MinWidth="96"
+                            Click="BtnNetworkLog_Click"/>
+                    <Button DockPanel.Dock="Left" x:Name="BtnNetworkReport" Content="Отчёт PDF"
+                            Style="{StaticResource SecondaryButton}" MinWidth="108" Margin="8,0,0,0"
+                            Click="BtnNetworkReport_Click"/>
+                    <Button DockPanel.Dock="Left" x:Name="BtnNetworkSummary" Content="Сводка подключений"
+                            Style="{StaticResource SecondaryButton}" MinWidth="168" Margin="8,0,0,0"
+                            Click="BtnNetworkSummary_Click"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button x:Name="BtnNetworkHelp" Content="Что удалится?" Style="{StaticResource SecondaryButton}"
+                                MinWidth="120" Margin="0,0,8,0" Click="NetworkHelp_Click"/>
+                        <Button x:Name="BtnNetworkSelect" Content="Выбрать все" Style="{StaticResource SecondaryButton}"
+                                MinWidth="108" Margin="0,0,8,0" Click="NetworkSelectAll_Click"/>
+                        <Button x:Name="BtnNetworkDeselect" Content="Снять все" Style="{StaticResource SecondaryButton}"
+                                MinWidth="108" Margin="0,0,8,0" Click="NetworkDeselect_Click"/>
+                        <Button x:Name="BtnNetworkScan" Content="Сканировать" Style="{StaticResource PrimaryButton}"
+                                MinWidth="124" Margin="0,0,8,0" Click="NetworkScan_Click"/>
+                        <Button x:Name="BtnNetworkClean" Content="Очистить следы" Style="{StaticResource DangerButton}"
+                                MinWidth="140" Click="NetworkClean_Click"/>
+                    </StackPanel>
+                </DockPanel>
             </Border>
 
-            <!-- Прогресс -->
-            <StackPanel Grid.Row="3" Margin="0,10,0,0">
-                <TextBlock x:Name="TxtPhase" Text="" Foreground="{StaticResource TextSecondaryBrush}"
-                           FontSize="11" Margin="0,0,0,4"/>
-                <ProgressBar x:Name="ProgressBar" Height="5" Minimum="0" Maximum="100"
-                             Background="#E5E7EB" Foreground="{StaticResource AccentBrush}"/>
-            </StackPanel>
-
-            <!-- Лог -->
-            <Border Grid.Row="4" Background="#0F172A" BorderBrush="#1E293B"
-                    BorderThickness="1" CornerRadius="12" Margin="0,10,0,0" Padding="0">
-                <TextBox x:Name="TxtLog" Background="Transparent" Foreground="#E5E7EB"
-                         FontFamily="Cascadia Mono, Consolas" FontSize="11" IsReadOnly="True"
-                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
-                         BorderThickness="0" Padding="12,10"/>
+            <!-- Other USB traces actions -->
+            <Border x:Name="OtherUsbBottomBar" Grid.Row="1" Style="{StaticResource ActionFooter}" Visibility="Collapsed">
+                <DockPanel LastChildFill="True">
+                    <Button DockPanel.Dock="Left" x:Name="BtnOtherUsbLog" Content="Журнал"
+                            Style="{StaticResource SecondaryButton}" MinWidth="96"
+                            Click="BtnOtherUsbLog_Click"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button x:Name="BtnOtherUsbSelect" Content="Выбрать все" Style="{StaticResource SecondaryButton}"
+                                MinWidth="108" Margin="0,0,8,0" Click="OtherUsbSelectAll_Click"/>
+                        <Button x:Name="BtnOtherUsbDeselect" Content="Снять все" Style="{StaticResource SecondaryButton}"
+                                MinWidth="108" Margin="0,0,8,0" Click="OtherUsbDeselect_Click"/>
+                        <Button x:Name="BtnOtherUsbScan" Content="Сканировать" Style="{StaticResource PrimaryButton}"
+                                MinWidth="124" Margin="0,0,8,0" Click="OtherUsbScan_Click"/>
+                        <Button x:Name="BtnOtherUsbClean" Content="Очистить выбранное" Style="{StaticResource DangerButton}"
+                                MinWidth="168" Click="OtherUsbClean_Click"/>
+                    </StackPanel>
+                </DockPanel>
             </Border>
         </Grid>
-            </TabItem>
-            <TabItem Header="Аудит сети">
-                <views:NetworkAuditView x:Name="NetworkView" Margin="22,18,22,18"
-                                        CategoriesChanged="NetworkView_CategoriesChanged"/>
-            </TabItem>
-        </TabControl>
-
-        <!-- Нижняя панель кнопок USB -->
-        <Border x:Name="UsbBottomBar" Grid.Column="1" VerticalAlignment="Bottom" Background="#FFFFFF"
-                BorderBrush="{StaticResource BorderBrushModern}" BorderThickness="0,1,0,0"
-                Padding="20,14">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button x:Name="BtnSelectAll" Content="Выбрать все" Style="{StaticResource SecondaryButton}"
-                        MinWidth="108" Margin="0,0,8,0" Click="BtnSelectAll_Click"/>
-                <Button x:Name="BtnDeselectAll" Content="Снять все" Style="{StaticResource SecondaryButton}"
-                        MinWidth="108" Margin="0,0,8,0" Click="BtnDeselectAll_Click"/>
-                <Button x:Name="BtnScan" Content="Сканировать" Style="{StaticResource PrimaryButton}"
-                        MinWidth="124" Margin="0,0,8,0" Click="BtnScan_Click"/>
-                <Button x:Name="BtnFixDuplicates" Content="Удалить призраки" Style="{StaticResource SecondaryButton}"
-                        MinWidth="140" Margin="0,0,8,0" Click="BtnFixDuplicates_Click"
-                        ToolTip="Найти и удалить дубликаты PnP"/>
-                <Button x:Name="BtnClean" Content="Очистить" Style="{StaticResource DangerButton}"
-                        MinWidth="124" Click="BtnClean_Click"/>
-            </StackPanel>
-        </Border>
     </Grid>
 </Window>

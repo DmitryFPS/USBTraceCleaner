@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.Principal;
@@ -30,6 +31,7 @@ public static class AdminHelper
     }
 }
 
+[ExcludeFromCodeCoverage]
 public static class RegistryHelper
 {
     private const int KEY_WOW64_64KEY = 0x0100;

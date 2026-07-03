@@ -1,5 +1,7 @@
 namespace USBTraceCleaner.Models;
 
+using System.Text.RegularExpressions;
+using Microsoft.Win32;
 using USBTraceCleaner.Services;
 
 public enum ArtifactCategory
@@ -27,6 +29,24 @@ public enum ArtifactType
 
 public sealed class ArtifactItem
 {
+    private static readonly Regex VidPidRegex = new(
+        @"V(?:ID)?[_]?([0-9A-Fa-f]{4})[&#_]{1,2}P(?:ID)?[_]?([0-9A-Fa-f]{4})",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    // usbflags: ключ вида 0E0F00020000 (VID+PID+ревизия, 12 hex).
+    private static readonly Regex UsbFlagsRegex = new(
+        @"\\usbflags\\([0-9A-Fa-f]{4})([0-9A-Fa-f]{4})[0-9A-Fa-f]{0,4}",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    private static readonly Guid FirstInstallProperty =
+        new("83da6326-97a6-4088-9453-a1923f573b29");
+
+    private string? _vid;
+    private string? _pid;
+    private bool _idsParsed;
+    private bool _firstConnectedRead;
+    private DateTime? _firstConnected;
+
     public required ArtifactCategory Category { get; init; }
     public required ArtifactType Type { get; init; }
     public required string Location { get; init; }
@@ -34,6 +54,95 @@ public sealed class ArtifactItem
     public string? Description { get; init; }
     public string? Detail { get; init; }
     public bool Selected { get; set; } = true;
+
+    private void EnsureIds()
+    {
+        if (_idsParsed) return;
+        _idsParsed = true;
+
+        var flags = UsbFlagsRegex.Match(Location);
+        if (flags.Success)
+        {
+            _vid = flags.Groups[1].Value.ToUpperInvariant();
+            _pid = flags.Groups[2].Value.ToUpperInvariant();
+            return;
+        }
+
+        var m = VidPidRegex.Match(Location);
+        if (m.Success)
+        {
+            _vid = m.Groups[1].Value.ToUpperInvariant();
+            _pid = m.Groups[2].Value.ToUpperInvariant();
+        }
+    }
+
+    public string? Vid { get { EnsureIds(); return _vid; } }
+    public string? Pid { get { EnsureIds(); return _pid; } }
+
+    public string DisplayVid => Vid ?? "—";
+    public string DisplayPid => Pid ?? "—";
+
+    public string DisplayManufacturer =>
+        Vid != null ? UsbVendorDatabase.LookupVendor(Vid) ?? "—" : "—";
+
+    public string DisplayModel =>
+        (Vid != null && Pid != null ? UsbVendorDatabase.LookupProduct(Vid, Pid) : null) ?? "—";
+
+    public DateTime? FirstConnected
+    {
+        get
+        {
+            if (_firstConnectedRead) return _firstConnected;
+            _firstConnectedRead = true;
+            _firstConnected = ReadFirstInstallDate();
+            return _firstConnected;
+        }
+    }
+
+    public string DisplayFirstConnected =>
+        FirstConnected?.ToString("yyyy-MM-dd HH:mm") ?? "—";
+
+    public string DisplaySource
+    {
+        get
+        {
+            var loc = Location;
+            if (loc.Contains(@"\Enum\USB\", StringComparison.OrdinalIgnoreCase)) return @"Enum\USB";
+            if (loc.Contains(@"\Enum\USBSTOR", StringComparison.OrdinalIgnoreCase)) return "USBSTOR";
+            if (loc.Contains(@"\usbflags", StringComparison.OrdinalIgnoreCase)) return "usbflags";
+            if (loc.Contains("DeviceMigration", StringComparison.OrdinalIgnoreCase)) return "DeviceMigration";
+            if (loc.Contains("DeviceClasses", StringComparison.OrdinalIgnoreCase)) return "DeviceClasses";
+            if (loc.Contains("DeviceContainers", StringComparison.OrdinalIgnoreCase)) return "DeviceContainers";
+            if (loc.Contains("MountedDevices", StringComparison.OrdinalIgnoreCase)) return "MountedDevices";
+            if (loc.Contains("MountPoints2", StringComparison.OrdinalIgnoreCase)) return "MountPoints2";
+            if (loc.Contains("WPDBUSENUM", StringComparison.OrdinalIgnoreCase)) return "WPD/MTP";
+            return Type switch
+            {
+                ArtifactType.File => "Файл",
+                ArtifactType.EventLog => "Журнал событий",
+                ArtifactType.Directory => "Каталог",
+                _ => DisplayCategory
+            };
+        }
+    }
+
+    private DateTime? ReadFirstInstallDate()
+    {
+        if (Type is not (ArtifactType.RegistryKey or ArtifactType.RegistryValue)) return null;
+        if (!Location.Contains(@"\Enum\USB\", StringComparison.OrdinalIgnoreCase)) return null;
+
+        var propertyKey = $@"{Location}\Properties\{FirstInstallProperty:B}";
+        try
+        {
+            using var baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+            using var key = baseKey.OpenSubKey(propertyKey);
+            if (key?.GetValue("0064") is not byte[] raw || raw.Length < 8) return null;
+            var fileTime = BitConverter.ToInt64(raw, 0);
+            if (fileTime <= 0) return null;
+            return DateTime.FromFileTimeUtc(fileTime).ToLocalTime();
+        }
+        catch { return null; }
+    }
 
     public ArtifactViewGroup ViewGroup => ArtifactClassifier.Classify(this);
 

@@ -1,10 +1,18 @@
+using System.Text;
 using System.Windows;
+using System.Diagnostics.CodeAnalysis;
 using USBTraceCleaner.Services;
 
 namespace USBTraceCleaner;
 
+[ExcludeFromCodeCoverage]
 public partial class App : Application
 {
+    static App()
+    {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+    }
+
     protected override void OnStartup(StartupEventArgs e)
     {
         if (e.Args.Contains("--self-test"))

@@ -1,0 +1,98 @@
+<UserControl x:Class="USBTraceCleaner.Views.OtherUsbTraceView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent">
+    <DockPanel LastChildFill="True">
+        <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+            <TextBlock x:Name="TxtOtherPhase" Text="" Foreground="{StaticResource TextSecondaryBrush}"
+                       FontSize="11" Margin="0,0,0,4"/>
+            <ProgressBar x:Name="ProgressOther" Height="4" Minimum="0" Maximum="100"
+                         Background="#E2E8F0" Foreground="{StaticResource AccentBrush}"/>
+        </StackPanel>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                <TextBlock Text="Другие USB-следы" Style="{StaticResource PageTitle}"/>
+                <TextBlock Text="usbflags, DeviceMigration, Setup\Upgrade — остаточные следы как нижняя таблица USBDetector (не флешки, не активные устройства)"
+                           Style="{StaticResource PageSubtitle}"/>
+            </StackPanel>
+
+            <Border Grid.Row="1" Style="{StaticResource MainCard}" Margin="0,0,0,12">
+                <TextBlock Margin="12" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12">
+                    Отметьте устройства и нажмите «Очистить выбранное». Флешки и USBSTOR не затрагиваются.
+                    После очистки перезагрузите Windows. Активные устройства могут появиться в списке снова.
+                </TextBlock>
+            </Border>
+
+            <Border Grid.Row="2" Style="{StaticResource MainCard}" MinHeight="180">
+                <DockPanel LastChildFill="True">
+                    <Border DockPanel.Dock="Top" Background="#F8FAFC"
+                            BorderBrush="{StaticResource BorderBrushModern}"
+                            BorderThickness="0,0,0,1" Padding="14,10">
+                        <TextBlock x:Name="TxtOtherCount" Text="Найдено: 0" FontWeight="SemiBold" FontSize="13"/>
+                    </Border>
+                    <DataGrid x:Name="GridOtherTraces"
+                              Style="{StaticResource ResultsDataGrid}"
+                              CellStyle="{StaticResource ResultsDataGridCell}"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False" CanUserDeleteRows="False"
+                              SelectionMode="Extended">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="✓" Width="44"
+                                                    CellStyle="{StaticResource ResultsDataGridCheckCell}">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <CheckBox Style="{StaticResource GridCheckBox}"
+                                                  IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}"
+                                                  Click="TraceCheck_Click"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="VID" Binding="{Binding DisplayVid}" IsReadOnly="True" Width="56">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="PID" Binding="{Binding DisplayPid}" IsReadOnly="True" Width="56">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Производитель" Binding="{Binding Manufacturer}" IsReadOnly="True" Width="140">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Модель" Binding="{Binding Model}" IsReadOnly="True" Width="160">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Первое подкл." Binding="{Binding DisplayFirstConnected}" IsReadOnly="True" Width="120">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Источник" Binding="{Binding SourceLabel}" IsReadOnly="True" Width="120">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Путь в реестре" Binding="{Binding DisplayLocation}" IsReadOnly="True" MinWidth="220" Width="*">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</UserControl>

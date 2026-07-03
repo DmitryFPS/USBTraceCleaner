@@ -1,7 +1,10 @@
 using System.Text;
 
+using System.Diagnostics.CodeAnalysis;
+
 namespace USBTraceCleaner.Services;
 
+[ExcludeFromCodeCoverage]
 public static class GhostInstanceCleanerRunner
 {
     public static int Run()

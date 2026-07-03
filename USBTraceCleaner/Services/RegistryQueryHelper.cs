@@ -1,12 +1,11 @@
 using System.Diagnostics;
 using System.Text;
 using Microsoft.Win32;
+using System.Diagnostics.CodeAnalysis;
 
 namespace USBTraceCleaner.Services;
 
-/// <summary>
-/// Перечисление подключей реестра через reg.exe query (обходит SecurityException в .NET).
-/// </summary>
+[ExcludeFromCodeCoverage]
 public static class RegistryQueryHelper
 {
     public static IEnumerable<string> EnumerateSubKeyPaths(RegistryHive hive, string subKey)

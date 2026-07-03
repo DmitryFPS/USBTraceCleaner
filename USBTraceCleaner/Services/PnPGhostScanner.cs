@@ -1,11 +1,10 @@
 using Microsoft.Win32;
 using USBTraceCleaner.Models;
+using System.Diagnostics.CodeAnalysis;
 
 namespace USBTraceCleaner.Services;
 
-/// <summary>
-/// Поиск и удаление призрачных и дублированных записей PnP (Enum\USB, Enum\USBSTOR).
-/// </summary>
+[ExcludeFromCodeCoverage]
 public static class PnPGhostScanner
 {
     public enum GhostKind

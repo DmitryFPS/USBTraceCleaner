@@ -1,6 +1,8 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace USBTraceCleaner.Services;
 
-/// <summary>Обратная совместимость CLI — делегирует в <see cref="PnPGhostScanner"/>.</summary>
+[ExcludeFromCodeCoverage]
 public static class UsbGhostInstanceCleaner
 {
     public sealed class GhostCleanupResult

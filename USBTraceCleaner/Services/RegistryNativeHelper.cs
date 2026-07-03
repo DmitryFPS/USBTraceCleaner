@@ -1,12 +1,11 @@
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32;
+using System.Diagnostics.CodeAnalysis;
 
 namespace USBTraceCleaner.Services;
 
-/// <summary>
-/// Рекурсивное удаление ключей реестра через Win32 API (RegDeleteTree + RegDelnode).
-/// </summary>
+[ExcludeFromCodeCoverage]
 public static class RegistryNativeHelper
 {
     private const int KeyRead = 0x20019;

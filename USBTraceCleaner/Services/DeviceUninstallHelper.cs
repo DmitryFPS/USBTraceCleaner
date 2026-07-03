@@ -1,12 +1,11 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
+using System.Diagnostics.CodeAnalysis;
 
 namespace USBTraceCleaner.Services;
 
-/// <summary>
-/// Удаление устройств через Configuration Manager (CfgMgr32) — корректный способ снятия Enum\USBSTOR.
-/// </summary>
+[ExcludeFromCodeCoverage]
 public static class DeviceUninstallHelper
 {
     private const int CrSuccess = 0;

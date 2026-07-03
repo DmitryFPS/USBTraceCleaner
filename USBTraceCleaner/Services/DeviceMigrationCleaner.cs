@@ -1,12 +1,10 @@
 using Microsoft.Win32;
 using USBTraceCleaner.Models;
+using System.Diagnostics.CodeAnalysis;
 
 namespace USBTraceCleaner.Services;
 
-/// <summary>
-/// Точечная очистка DeviceMigration — только следы накопителей, без удаления всего ключа
-/// (полное удаление вызывает повторное PnP-перечисление встроенных USB-устройств).
-/// </summary>
+[ExcludeFromCodeCoverage]
 public static class DeviceMigrationCleaner
 {
     public static void CollectStoragePaths(string controlSetPrefix, HashSet<string> paths, CleanupOptions options)

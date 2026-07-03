@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <Include>[USBTraceCleaner]*</Include>
+          <Exclude>[USBTraceCleaner]*MainWindow*,[USBTraceCleaner]*Views*,[USBTraceCleaner]*App,[USBTraceCleaner]*UsboOblivionCleanup*,[USBTraceCleaner]*NetworkPostCleanActions*,[USBTraceCleaner]*RegistrySecurityHelper*,[USBTraceCleaner]*DeviceUninstallHelper*,[USBTraceCleaner]*RouterAuditScanner*,[USBTraceCleaner]*RegistrySystemHelper*,[USBTraceCleaner]*GhostInstanceCleanerRunner*,[USBTraceCleaner]*HeadlessCleaner*,[USBTraceCleaner]*SelfTestRunner*,[USBTraceCleaner]*LogRestoreRunner*</Exclude>
+          <ExcludeByFile>**/Views/**,**/MainWindow.xaml.cs,**/App.xaml.cs,**/*Window.xaml.cs</ExcludeByFile>
+          <ExcludeByAttribute>Obsolete,GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

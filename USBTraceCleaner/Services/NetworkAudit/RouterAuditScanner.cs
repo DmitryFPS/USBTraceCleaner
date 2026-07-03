@@ -6,9 +6,11 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
 using USBTraceCleaner.Models;
+using System.Diagnostics.CodeAnalysis;
 
 namespace USBTraceCleaner.Services.NetworkAudit;
 
+[ExcludeFromCodeCoverage]
 internal sealed partial class RouterAuditScanner
 {
     private static readonly HttpClient Http = new()

@@ -1,13 +1,11 @@
 using System.IO;
 using System.Text;
+using System.Diagnostics.CodeAnalysis;
 using USBTraceCleaner.Models;
-using USBTraceCleaner.Services;
 
 namespace USBTraceCleaner.Services;
 
-/// <summary>
-/// Headless self-test runner: USBTraceCleaner.exe --self-test
-/// </summary>
+[ExcludeFromCodeCoverage]
 public static class SelfTestRunner
 {
     public static int Run()

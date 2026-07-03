@@ -9,7 +9,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>USBTraceCleaner</AssemblyName>
     <RootNamespace>USBTraceCleaner</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>1.6.0</Version>
     <Description>Очистка следов USB-устройств в Windows 10/11</Description>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PublishSingleFile>true</PublishSingleFile>
@@ -22,19 +22,31 @@
   <ItemGroup>
     <None Include="Assets\app-icon-source.png" />
     <Resource Include="Assets\app.ico" />
+    <EmbeddedResource Include="Assets\USBVendors.txt" />
   </ItemGroup>
 
   <Target Name="GenerateAppIcon" BeforeTargets="BeforeBuild">
     <Exec Command="dotnet run --project &quot;$(MSBuildProjectDirectory)\..\tools\IconGen\IconGen.csproj&quot; -- &quot;$(MSBuildProjectDirectory)\Assets\app-icon-source.png&quot; &quot;$(MSBuildProjectDirectory)\Assets\app.ico&quot;" />
   </Target>
 
-  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+  <PropertyGroup Condition="'$(Configuration)' == 'Release' and '$(CollectCoverage)' != 'true'">
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(CollectCoverage)' == 'true'">
+    <DebugType>embedded</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
   <ItemGroup>
+    <InternalsVisibleTo Include="USBTraceCleaner.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="QuestPDF" Version="2024.12.3" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.1" />
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
   </ItemGroup>
 
 </Project>

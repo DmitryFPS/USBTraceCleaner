@@ -21,3 +21,6 @@ Desktop.ini
 # Logs / backups from app runs
 USBTraceCleaner_backup_*.reg
 USBTraceCleaner_manifest_*.txt
+
+# Test coverage output
+TestResults/

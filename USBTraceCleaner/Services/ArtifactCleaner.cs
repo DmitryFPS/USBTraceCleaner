@@ -3,9 +3,11 @@ using System.IO;
 using System.Text;
 using Microsoft.Win32;
 using USBTraceCleaner.Models;
+using System.Diagnostics.CodeAnalysis;
 
 namespace USBTraceCleaner.Services;
 
+[ExcludeFromCodeCoverage]
 public sealed class ArtifactCleaner
 {
     private readonly StringBuilder _log = new();

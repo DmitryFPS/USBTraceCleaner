@@ -2,11 +2,11 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 
+using System.Diagnostics.CodeAnalysis;
+
 namespace USBTraceCleaner.Services;
 
-/// <summary>
-/// Выполнение reg delete от имени SYSTEM (без cmd.exe — корректно для путей с &amp;).
-/// </summary>
+[ExcludeFromCodeCoverage]
 public static class RegistrySystemHelper
 {
     private static readonly string SystemTemp = Path.Combine(

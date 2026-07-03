@@ -1,22 +1,33 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using USBTraceCleaner.Models;
 using USBTraceCleaner.Services;
 using USBTraceCleaner.Services.NetworkAudit;
+using USBTraceCleaner.Services.Report;
+using System.Diagnostics.CodeAnalysis;
 
 namespace USBTraceCleaner.Views;
 
+[ExcludeFromCodeCoverage]
 public partial class NetworkAuditView : UserControl
 {
     private readonly ObservableCollection<NetworkAuditItem> _items = [];
     private readonly ICollectionView _view;
     private readonly NetworkAuditScanner _scanner = new();
     private readonly NetworkAuditCleaner _cleaner = new();
+    private readonly StringBuilder _log = new();
     private NetworkAuditFilterGroup _activeFilter = NetworkAuditFilterGroup.All;
+    private ReportOperationType _lastOperation = ReportOperationType.Scan;
+    private NetworkAuditOptions? _lastOptions;
+    private NetworkAuditCleaner.CleanResult? _lastCleanResult;
+    private NetworkAuditReadableSummary? _lastSummary;
+
     public event Action<NetworkAuditFilterGroup, IReadOnlyList<(NetworkAuditFilterGroup Group, string Label, int Count)>>? CategoriesChanged;
+    public event Action<bool>? OperationBusyChanged;
 
     public NetworkAuditView()
     {
@@ -25,13 +36,54 @@ public partial class NetworkAuditView : UserControl
         InitializeComponent();
 
         GridNetwork.ItemsSource = _view;
-        DpFrom.SelectedDate = DateTime.Today.AddDays(-30);
+        DpFrom.SelectedDate = DateTime.Today.AddDays(-90);
         DpTo.SelectedDate = DateTime.Today;
 
-        AppendLog("Аудит сети — Windows 10/11");
-        AppendLog("Источники: Wi‑Fi, Ethernet, VPN, DNS, реестр, журналы, SRU, роутер (SNMP/HTTP/ARP).");
-        AppendLog("Укажите период и при необходимости логин роутера.");
+        ChkShowUnknownOnly.Checked += (_, _) => { _view.Refresh(); UpdateCount(); };
+        ChkShowUnknownOnly.Unchecked += (_, _) => { _view.Refresh(); UpdateCount(); };
+
+        AppendLog($"Аудит сети {AppInfo.VersionLabel} — Windows 10/11");
+        AppendLog("«Разрешено» = ваше подключение; при очистке удаляется вместе с остальными.");
+        AppendLog("Максимальная очистка: все следы на ПК, отключение сети, перезагрузка.");
         AppendLog("");
+    }
+
+    public void ExportPdfReport(Window owner)
+    {
+        if (_items.Count == 0 && _log.Length == 0)
+        {
+            MessageBox.Show("Сначала выполните сканирование или очистку.", "Отчёт PDF",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var request = ReportExportService.BuildNetworkReport(
+            _lastOperation,
+            _items,
+            _log.ToString(),
+            _lastOptions,
+            _lastCleanResult);
+
+        ReportExportService.TrySavePdf(request, owner);
+    }
+
+    public string GetLogText() => _log.ToString();
+
+    public void ShowSummaryDialog(Window owner)
+    {
+        if (_items.Count == 0)
+        {
+            MessageBox.Show(
+                "Сначала выполните сканирование.",
+                "Сводка подключений",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        var summary = NetworkAuditSummaryBuilder.Build(_items, BuildOptions().Whitelist);
+        _lastSummary = summary;
+        NetworkSummaryWindow.ShowDialog(owner, summary);
     }
 
     public void SetCategoryFilter(NetworkAuditFilterGroup group)
@@ -61,6 +113,134 @@ public partial class NetworkAuditView : UserControl
         return groups.Select(g => (g, FormatLabel(g), CountInGroup(g))).ToList();
     }
 
+    public void ShowHelp()
+    {
+        var unknown = _items.Count(i => i.AuthorizationStatus == NetworkAuthorizationStatus.Unknown);
+        var cleanable = _items.Count(i => i.CanClean);
+        MessageBox.Show(
+            NetworkAuditHints.HelpText +
+            $"\n\nСейчас: всего {_items.Count}, неизвестных {unknown}, для очистки {cleanable}.",
+            "Справка по аудиту сети",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+    }
+
+    public void SelectAll()
+    {
+        foreach (NetworkAuditItem item in _view)
+            item.Selected = item.CanClean;
+        GridNetwork.Items.Refresh();
+        UpdateCount();
+    }
+
+    public void DeselectAll()
+    {
+        foreach (var item in _items)
+            item.Selected = false;
+        GridNetwork.Items.Refresh();
+        UpdateCount();
+    }
+
+    public async Task ScanAsync() => await RunScan();
+
+    public async Task CleanAsync()
+    {
+        if (!AdminHelper.IsAdministrator())
+        {
+            MessageBox.Show("Запустите программу от имени администратора.", "Нужны права",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var options = BuildOptions();
+        var fullClean = options.FullCleanMode;
+
+        if (fullClean)
+        {
+            foreach (var item in _items.Where(i => i.CanClean))
+                item.Selected = true;
+        }
+
+        var selected = _items.Count(i => i.Selected && i.CanClean);
+        if (selected == 0)
+        {
+            MessageBox.Show("Нет элементов для очистки.", "Аудит сети",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (fullClean && IsVpnAdapterActive())
+        {
+            var vpnWarn = MessageBox.Show(
+                "Обнаружен активный VPN-адаптер (happ-tun или другой туннель).\n\n" +
+                "Закройте HAPP/VPN перед очисткой — иначе следы VPN могут остаться.\n\n" +
+                "Продолжить очистку?",
+                "VPN активен",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+            if (vpnWarn != MessageBoxResult.Yes) return;
+        }
+
+        if (_items.Any(i => i.Kind == NetworkAuditKind.HostsFile && i.CanClean))
+        {
+            var hostsAnswer = MessageBox.Show(
+                NetworkAuditHints.HostsWarning,
+                "Файл hosts",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+            options.CleanHostsFile = hostsAnswer == MessageBoxResult.Yes;
+        }
+
+        var answer = MessageBox.Show(
+            NetworkAuditHints.BuildCleanupWarning(_items, fullClean),
+            fullClean ? "Максимальная очистка" : "Подтверждение очистки",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (answer != MessageBoxResult.Yes) return;
+
+        SetBusy(true);
+        try
+        {
+            var result = await Task.Run(() => _cleaner.Execute(_items, options, AppendLog));
+            _lastOperation = ReportOperationType.Clean;
+            _lastCleanResult = result;
+            _lastOptions = options;
+
+            var failDetails = result.Failures.Count > 0
+                ? "\n\nОшибки (требуют внимания):\n" + string.Join("\n", result.Failures)
+                : string.Empty;
+            var skipDetails = result.SkippedItems.Count > 0
+                ? "\n\nПропущено (нет в Windows):\n" + string.Join("\n", result.SkippedItems)
+                : string.Empty;
+            var stats = $"Успешно: {result.Processed}, пропущено: {result.Skipped}, ошибок: {result.Failed}";
+
+            if (options.RebootAfterClean)
+            {
+                MessageBox.Show(
+                    "Очистка выполнена.\n\n" +
+                    "Wi‑Fi сессия разорвана (адаптер не отключается).\n" +
+                    "Windows перезагрузится через 60 секунд.\n\n" +
+                    "После перезагрузки можно сразу сохранить «Отчёт PDF» без интернета.\n\n" +
+                    stats + failDetails + skipDetails,
+                    "Готово",
+                    MessageBoxButton.OK,
+                    result.Failed > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
+            }
+            else
+            {
+                await RunScan();
+                MessageBox.Show(
+                    stats + failDetails + skipDetails,
+                    "Готово", MessageBoxButton.OK,
+                    result.Failed > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
+            }
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
     private static string FormatLabel(NetworkAuditFilterGroup g) => g switch
     {
         NetworkAuditFilterGroup.All => "Все",
@@ -79,52 +259,12 @@ public partial class NetworkAuditView : UserControl
     private bool FilterItem(object obj)
     {
         if (obj is not NetworkAuditItem item) return false;
-        if (_activeFilter == NetworkAuditFilterGroup.All) return true;
-        return item.FilterGroup == _activeFilter;
-    }
-
-    private async void BtnNetScan_Click(object sender, RoutedEventArgs e) => await RunScan();
-
-    private async void BtnNetClean_Click(object sender, RoutedEventArgs e)
-    {
-        if (!AdminHelper.IsAdministrator())
-        {
-            MessageBox.Show("Запустите программу от имени администратора.", "Нужны права",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-
-        var selected = _items.Count(i => i.Selected && i.CanClean);
-        if (selected == 0)
-        {
-            MessageBox.Show("Нет выбранных элементов для очистки.", "Аудит сети",
-                MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-
-        var answer = MessageBox.Show(
-            $"Будут очищены сетевые следы: {selected} элементов.\n\n" +
-            "• Wi‑Fi профили и пароли\n• DNS / NetBIOS кэш\n• Журналы событий\n• Записи реестра сети\n\nПродолжить?",
-            "Подтверждение",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning);
-        if (answer != MessageBoxResult.Yes) return;
-
-        SetBusy(true);
-        try
-        {
-            var options = BuildOptions();
-            var result = await Task.Run(() => _cleaner.Execute(_items, options, AppendLog));
-            AppendLog(result.Log);
-            await RunScan();
-            MessageBox.Show($"Обработано: {result.Processed}\nОшибок: {result.Failed}",
-                "Готово", MessageBoxButton.OK,
-                result.Failed > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
-        }
-        finally
-        {
-            SetBusy(false);
-        }
+        if (_activeFilter != NetworkAuditFilterGroup.All && item.FilterGroup != _activeFilter)
+            return false;
+        if (ChkShowUnknownOnly.IsChecked == true &&
+            item.AuthorizationStatus != NetworkAuthorizationStatus.Unknown)
+            return false;
+        return true;
     }
 
     private async Task RunScan()
@@ -133,6 +273,9 @@ public partial class NetworkAuditView : UserControl
         try
         {
             var options = BuildOptions();
+            _lastOptions = options;
+            _lastOperation = ReportOperationType.Scan;
+            _lastCleanResult = null;
             AppendLog($"--- Сканирование {options.DateFrom:dd.MM.yyyy} — {options.DateTo:dd.MM.yyyy} ---");
 
             var progress = new Progress<NetworkAuditProgress>(p =>
@@ -144,8 +287,14 @@ public partial class NetworkAuditView : UserControl
 
             ProgressNetwork.IsIndeterminate = true;
             var found = await Task.Run(() => _scanner.Scan(options, progress));
-            LoadResults(found, options.ShowSecrets);
+            LoadResults(found, options);
+            _lastSummary = NetworkAuditSummaryBuilder.Build(found, options.Whitelist);
+            AppendLog("");
+            AppendLog("--- Сводка ---");
+            AppendLog(_lastSummary.ToPlainText());
             AppendLog($"Найдено записей: {found.Count}");
+            var unknown = found.Count(i => i.AuthorizationStatus == NetworkAuthorizationStatus.Unknown);
+            AppendLog($"Неизвестных (не в белом списке): {unknown}");
             TxtNetworkPhase.Text = "Сканирование завершено";
         }
         catch (Exception ex)
@@ -161,12 +310,13 @@ public partial class NetworkAuditView : UserControl
         }
     }
 
-    private void LoadResults(IReadOnlyList<NetworkAuditItem> found, bool showSecrets)
+    private void LoadResults(IReadOnlyList<NetworkAuditItem> found, NetworkAuditOptions options)
     {
         _items.Clear();
         foreach (var item in found)
         {
-            item.MaskSecrets = !showSecrets;
+            item.MaskSecrets = !options.ShowSecrets;
+            item.Selected = options.FullCleanMode ? item.CanClean : item.CanClean;
             _items.Add(item);
         }
         _view.Refresh();
@@ -177,10 +327,10 @@ public partial class NetworkAuditView : UserControl
     private NetworkAuditOptions BuildOptions() =>
         new()
         {
-            DateFrom = DpFrom.SelectedDate?.Date ?? DateTime.Today.AddDays(-30),
+            DateFrom = DpFrom.SelectedDate?.Date ?? DateTime.Today.AddDays(-90),
             DateTo = (DpTo.SelectedDate?.Date ?? DateTime.Today).AddDays(1).AddSeconds(-1),
             ShowSecrets = ChkShowSecrets.IsChecked == true,
-            SimulationMode = ChkSimulate.IsChecked == true,
+            SimulationMode = false,
             RouterIp = string.IsNullOrWhiteSpace(TxtRouterIp.Text) ? null : TxtRouterIp.Text.Trim(),
             RouterLogin = string.IsNullOrWhiteSpace(TxtRouterLogin.Text) ? null : TxtRouterLogin.Text.Trim(),
             RouterPassword = TxtRouterPassword.Password,
@@ -192,30 +342,26 @@ public partial class NetworkAuditView : UserControl
             ScanEventLogs = ChkLogs.IsChecked == true,
             ScanRegistry = ChkRegistry.IsChecked == true,
             ScanCaches = ChkCache.IsChecked == true,
-            ScanUsbBluetooth = ChkUsbBt.IsChecked == true
+            ScanUsbBluetooth = ChkUsbBt.IsChecked == true,
+            Whitelist = NetworkAuditWhitelist.Parse(TxtAllowedIps.Text, TxtAllowedWiFi.Text, TxtAllowedVpn.Text),
+            FullCleanMode = ChkFullClean.IsChecked == true,
+            DisconnectNetwork = ChkDisconnect.IsChecked == true,
+            RebootAfterClean = ChkReboot.IsChecked == true,
+            ShowUnknownOnly = ChkShowUnknownOnly.IsChecked == true
         };
 
-    private void BtnNetSelectAll_Click(object sender, RoutedEventArgs e)
-    {
-        foreach (NetworkAuditItem item in _view)
-            if (item.CanClean) item.Selected = true;
-        GridNetwork.Items.Refresh();
-        UpdateCount();
-    }
-
-    private void BtnNetDeselectAll_Click(object sender, RoutedEventArgs e)
-    {
-        foreach (var item in _items)
-            item.Selected = false;
-        GridNetwork.Items.Refresh();
-        UpdateCount();
-    }
+    private void NetworkCheck_Click(object sender, RoutedEventArgs e) => UpdateCount();
 
     private void UpdateCount()
     {
         var visible = _view.Cast<NetworkAuditItem>().ToList();
+        var cleanable = _items.Count(i => i.CanClean);
+        var unknown = _items.Count(i => i.AuthorizationStatus == NetworkAuthorizationStatus.Unknown);
+        var allowed = _items.Count(i => i.AuthorizationStatus == NetworkAuthorizationStatus.Allowed);
+        var selectedClean = _items.Count(i => i.Selected && i.CanClean);
         TxtNetworkCount.Text =
-            $"Показано: {visible.Count} из {_items.Count} | Выбрано: {_items.Count(i => i.Selected)} | Очищаемых: {_items.Count(i => i.Selected && i.CanClean)}";
+            $"Показано: {visible.Count} из {_items.Count} | Разрешено: {allowed} | Неизвестно: {unknown} | " +
+            $"Для очистки: {cleanable} | Отмечено: {selectedClean}";
     }
 
     private int CountInGroup(NetworkAuditFilterGroup group) =>
@@ -223,17 +369,20 @@ public partial class NetworkAuditView : UserControl
             ? _items.Count
             : _items.Count(i => i.FilterGroup == group);
 
-    private void AppendLog(string line)
+    private void AppendLog(string line) => _log.AppendLine(line);
+
+    private static bool IsVpnAdapterActive()
     {
-        TxtNetworkLog.AppendText(line + Environment.NewLine);
-        TxtNetworkLog.ScrollToEnd();
+        try
+        {
+            var output = ProcessRunner.Run("powershell", "-NoProfile -Command \"Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -and ($_.InterfaceDescription -like '*tun*' -or $_.InterfaceDescription -like '*Tunnel*' -or $_.Name -like '*happ*') } | Select-Object -ExpandProperty Name\"");
+            return !string.IsNullOrWhiteSpace(output);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
-    private void SetBusy(bool busy)
-    {
-        BtnNetScan.IsEnabled = !busy;
-        BtnNetClean.IsEnabled = !busy;
-        BtnNetSelectAll.IsEnabled = !busy;
-        BtnNetDeselectAll.IsEnabled = !busy;
-    }
+    private void SetBusy(bool busy) => OperationBusyChanged?.Invoke(busy);
 }

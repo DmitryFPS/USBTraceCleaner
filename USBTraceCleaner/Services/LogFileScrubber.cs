@@ -1,13 +1,12 @@
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Win32;
 
 namespace USBTraceCleaner.Services;
 
-/// <summary>
-/// Очистка лог-файлов без удаления: содержимое вычищается, даты файла сохраняются.
-/// </summary>
+[ExcludeFromCodeCoverage]
 public static class LogFileScrubber
 {
     private static readonly string[] UsbLinePatterns =

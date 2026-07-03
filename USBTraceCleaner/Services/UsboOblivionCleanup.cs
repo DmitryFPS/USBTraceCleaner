@@ -1,21 +1,12 @@
 using Microsoft.Win32;
-
+using System.Diagnostics.CodeAnalysis;
 using USBTraceCleaner.Models;
-
-
 
 namespace USBTraceCleaner.Services;
 
-
-
-/// <summary>
-
-/// Сбор и удаление ключей реестра по алгоритму USBOblivion (без полного reg query /s).
-
-/// </summary>
-
+// Сбор ключей по алгоритму USBOblivion (без полного reg query /s).
+[ExcludeFromCodeCoverage]
 public static class UsboOblivionCleanup
-
 {
 
     private static readonly string[] StorageServices = ["USBSTOR", "UASPStor"];
