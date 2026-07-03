@@ -12,6 +12,7 @@ out/
 *.suo
 *.userosscache
 *.sln.docstates
+.idea
 
 # OS
 Thumbs.db
