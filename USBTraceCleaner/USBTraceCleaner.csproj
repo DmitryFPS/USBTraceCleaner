@@ -26,7 +26,7 @@
   </ItemGroup>
 
   <Target Name="GenerateAppIcon" BeforeTargets="BeforeBuild">
-    <Exec Command="dotnet run --project &quot;$(MSBuildProjectDirectory)\..\tools\IconGen\IconGen.csproj&quot; -- &quot;$(MSBuildProjectDirectory)\Assets\app-icon-source.png&quot; &quot;$(MSBuildProjectDirectory)\Assets\app.ico&quot;" />
+    <Exec Command="dotnet run --verbosity quiet --project &quot;$(MSBuildProjectDirectory)\..\tools\IconGen\IconGen.csproj&quot; -- &quot;$(MSBuildProjectDirectory)\Assets\app-icon-source.png&quot; &quot;$(MSBuildProjectDirectory)\Assets\app.ico&quot;" StandardOutputImportance="Low" StandardErrorImportance="Low" />
   </Target>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release' and '$(CollectCoverage)' != 'true'">
