@@ -14,7 +14,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
+                <RowDefinition Height="*" MinHeight="0"/>
             </Grid.RowDefinitions>
 
             <StackPanel Grid.Row="0" Margin="0,0,0,12">
@@ -30,21 +30,27 @@
                 </TextBlock>
             </Border>
 
-            <Border Grid.Row="2" Style="{StaticResource MainCard}" MinHeight="180">
-                <DockPanel LastChildFill="True">
-                    <Border DockPanel.Dock="Top" Background="#F8FAFC"
+            <Border x:Name="OtherResultsHost" Grid.Row="2" Style="{StaticResource MainCard}" MinHeight="180">
+                <Grid x:Name="OtherResultsGrid">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*" MinHeight="0"/>
+                    </Grid.RowDefinitions>
+                    <Border Grid.Row="0" Background="#F8FAFC"
                             BorderBrush="{StaticResource BorderBrushModern}"
                             BorderThickness="0,0,0,1" Padding="14,10">
                         <TextBlock x:Name="TxtOtherCount" Text="Найдено: 0" FontWeight="SemiBold" FontSize="13"/>
                     </Border>
-                    <DataGrid x:Name="GridOtherTraces"
+                    <DataGrid x:Name="GridOtherTraces" Grid.Row="1"
                               Style="{StaticResource ResultsDataGrid}"
                               CellStyle="{StaticResource ResultsDataGridCell}"
                               AutoGenerateColumns="False"
                               CanUserAddRows="False" CanUserDeleteRows="False"
-                              SelectionMode="Extended">
+                              SelectionMode="Extended"
+                              ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                              ScrollViewer.VerticalScrollBarVisibility="Auto">
                         <DataGrid.Columns>
-                            <DataGridTemplateColumn Header="✓" Width="44"
+                            <DataGridTemplateColumn Header="✓" Width="44" MinWidth="44" CanUserResize="False"
                                                     CellStyle="{StaticResource ResultsDataGridCheckCell}">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
@@ -54,44 +60,44 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="VID" Binding="{Binding DisplayVid}" IsReadOnly="True" Width="56">
+                            <DataGridTextColumn Header="VID" Binding="{Binding DisplayVid}" IsReadOnly="True" Width="64" MinWidth="56">
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
-                            <DataGridTextColumn Header="PID" Binding="{Binding DisplayPid}" IsReadOnly="True" Width="56">
+                            <DataGridTextColumn Header="PID" Binding="{Binding DisplayPid}" IsReadOnly="True" Width="64" MinWidth="56">
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
-                            <DataGridTextColumn Header="Производитель" Binding="{Binding Manufacturer}" IsReadOnly="True" Width="140">
+                            <DataGridTextColumn Header="Производитель" Binding="{Binding Manufacturer}" IsReadOnly="True" Width="200" MinWidth="120">
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
-                            <DataGridTextColumn Header="Модель" Binding="{Binding Model}" IsReadOnly="True" Width="160">
+                            <DataGridTextColumn Header="Модель" Binding="{Binding Model}" IsReadOnly="True" Width="220" MinWidth="140">
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
-                            <DataGridTextColumn Header="Первое подкл." Binding="{Binding DisplayFirstConnected}" IsReadOnly="True" Width="120">
+                            <DataGridTextColumn Header="Первое подкл." Binding="{Binding DisplayFirstConnected}" IsReadOnly="True" Width="150" MinWidth="120">
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
-                            <DataGridTextColumn Header="Источник" Binding="{Binding SourceLabel}" IsReadOnly="True" Width="120">
+                            <DataGridTextColumn Header="Источник" Binding="{Binding SourceLabel}" IsReadOnly="True" Width="160" MinWidth="110">
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
-                            <DataGridTextColumn Header="Путь в реестре" Binding="{Binding DisplayLocation}" IsReadOnly="True" MinWidth="220" Width="*">
+                            <DataGridTextColumn Header="Путь в реестре" Binding="{Binding DisplayLocation}" IsReadOnly="True" Width="200" MinWidth="200">
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
                         </DataGrid.Columns>
                     </DataGrid>
-                </DockPanel>
+                </Grid>
             </Border>
         </Grid>
     </DockPanel>

@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using USBTraceCleaner.Controls;
 using USBTraceCleaner.Models;
 using USBTraceCleaner.Services;
 using USBTraceCleaner.Services.Report;
@@ -378,6 +379,8 @@ public partial class MainWindow : Window
             TxtFoundCount.Text =
                 $"В разделе: {visible.Count} | Выбрано в разделе: {selectedVisible} | Всего выбрано: {selectedAll}";
         }
+
+        DataGridScrollHelper.SizeLastColumnToContent(GridArtifacts);
     }
 
     private async void BtnFixDuplicates_Click(object sender, RoutedEventArgs e)

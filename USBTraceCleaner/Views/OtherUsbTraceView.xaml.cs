@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using USBTraceCleaner.Controls;
 using USBTraceCleaner.Models;
 using USBTraceCleaner.Services;
 using System.Diagnostics.CodeAnalysis;
@@ -143,6 +144,7 @@ public partial class OtherUsbTraceView : UserControl
     {
         var selected = _items.Count(i => i.Selected);
         TxtOtherCount.Text = $"Найдено: {_items.Count} | Выбрано: {selected}";
+        DataGridScrollHelper.SizeLastColumnToContent(GridOtherTraces);
     }
 
     private void AppendLog(string line) => _log.AppendLine(line);

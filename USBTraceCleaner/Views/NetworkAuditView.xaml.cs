@@ -4,6 +4,7 @@ using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using USBTraceCleaner.Controls;
 using USBTraceCleaner.Models;
 using USBTraceCleaner.Services;
 using USBTraceCleaner.Services.NetworkAudit;
@@ -362,6 +363,7 @@ public partial class NetworkAuditView : UserControl
         TxtNetworkCount.Text =
             $"Показано: {visible.Count} из {_items.Count} | Разрешено: {allowed} | Неизвестно: {unknown} | " +
             $"Для очистки: {cleanable} | Отмечено: {selectedClean}";
+        DataGridScrollHelper.SizeLastColumnToContent(GridNetwork);
     }
 
     private int CountInGroup(NetworkAuditFilterGroup group) =>

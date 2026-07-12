@@ -60,12 +60,12 @@
 
 Требуется [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
 
+Команды ниже выполняйте из **корня репозитория** (где `USBTraceCleaner.sln`).
+
 ### Обычная сборка (нужен установленный .NET 8 на целевом ПК)
 
 ```powershell
-cd USBTraceCleaner
-dotnet build -c Release
-dotnet publish -c Release -r win-x64 --self-contained false
+dotnet publish USBTraceCleaner\USBTraceCleaner.csproj -c Release -r win-x64 --self-contained false
 ```
 
 Результат: `USBTraceCleaner\bin\Release\net8.0-windows\win-x64\publish\USBTraceCleaner.exe`
@@ -73,8 +73,7 @@ dotnet publish -c Release -r win-x64 --self-contained false
 ### Портативный exe (один файл, .NET на целевом ПК не нужен)
 
 ```powershell
-cd USBTraceCleaner
-dotnet publish -c Release -r win-x64 --self-contained true `
+dotnet publish USBTraceCleaner\USBTraceCleaner.csproj -c Release -r win-x64 --self-contained true `
   -p:PublishSingleFile=true `
   -p:IncludeNativeLibrariesForSelfExtract=true `
   -p:EnableCompressionInSingleFile=true

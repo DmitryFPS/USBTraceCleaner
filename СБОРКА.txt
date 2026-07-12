@@ -1,0 +1,10 @@
+USBTraceCleaner — как собрать exe
+
+1. Установите .NET 8 SDK: https://dotnet.microsoft.com/download/dotnet/8.0
+2. Откройте PowerShell в корне проекта (где лежит USBTraceCleaner.sln).
+3. Выполните:
+
+dotnet publish USBTraceCleaner\USBTraceCleaner.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+
+4. Готовый файл: USBTraceCleaner\bin\Release\net8.0-windows\win-x64\publish\USBTraceCleaner.exe
+5. Запускайте exe от имени администратора.
