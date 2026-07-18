@@ -300,24 +300,8 @@ public static class RegistryHelper
 
     private static int RunProcess(string file, string[] args)
     {
-        var psi = new ProcessStartInfo(file)
-        {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        };
-        foreach (var arg in args)
-            psi.ArgumentList.Add(arg);
-
-        using var proc = Process.Start(psi);
-        if (proc == null) return -1;
-        if (!proc.WaitForExit(15000))
-        {
-            try { proc.Kill(true); } catch { }
-            return -1;
-        }
-        return proc.ExitCode;
+        var result = ProcessExec.Run(file, args, 15_000);
+        return result.TimedOut ? -1 : result.ExitCode;
     }
 
     public static bool DeleteValue(RegistryHive hive, string subKey, string valueName, bool simulation, Action<string>? log = null)
@@ -456,17 +440,8 @@ public static class RegistryHelper
 
     public static int RunReg(string arguments)
     {
-        var psi = new ProcessStartInfo("reg.exe", arguments)
-        {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        };
-        using var proc = Process.Start(psi);
-        if (proc == null) return -1;
-        proc.WaitForExit(120000);
-        return proc.ExitCode;
+        var result = ProcessExec.Run("reg.exe", arguments, 120_000);
+        return result.TimedOut ? -1 : result.ExitCode;
     }
 
     public static IEnumerable<string> EnumerateUserSids()

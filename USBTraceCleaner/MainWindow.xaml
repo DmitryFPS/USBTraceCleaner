@@ -50,10 +50,16 @@
                              ItemContainerStyle="{StaticResource CategoryListBoxItem}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <TextBlock TextWrapping="Wrap">
-                                    <Run Text="{Binding Name}"/>
-                                    <Run Text="{Binding Count, StringFormat=' ({0})'}"/>
-                                </TextBlock>
+                                <DockPanel LastChildFill="True">
+                                    <TextBlock DockPanel.Dock="Right" Margin="6,0,0,0"
+                                               FontSize="10" Opacity="0.8"
+                                               VerticalAlignment="Center"
+                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                               Text="{Binding Count, StringFormat={}{0}}"/>
+                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"
+                                               TextWrapping="NoWrap" VerticalAlignment="Center"
+                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                                </DockPanel>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
@@ -242,6 +248,10 @@
                 <TabItem Header="Другие USB-следы" Style="{StaticResource AppTabItem}">
                     <views:OtherUsbTraceView x:Name="OtherUsbView" Margin="20,0,20,12"/>
                 </TabItem>
+                <!-- Event Viewer -->
+                <TabItem Header="Журналы событий" Style="{StaticResource AppTabItem}">
+                    <views:EventLogsView x:Name="EventLogsView" Margin="20,0,20,12"/>
+                </TabItem>
             </TabControl>
 
             <!-- USB actions -->
@@ -310,6 +320,28 @@
                                 MinWidth="124" Margin="0,0,8,0" Click="OtherUsbScan_Click"/>
                         <Button x:Name="BtnOtherUsbClean" Content="Очистить выбранное" Style="{StaticResource DangerButton}"
                                 MinWidth="168" Click="OtherUsbClean_Click"/>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- Event logs actions -->
+            <Border x:Name="EventLogsBottomBar" Grid.Row="1" Style="{StaticResource ActionFooter}" Visibility="Collapsed">
+                <DockPanel LastChildFill="True">
+                    <Button DockPanel.Dock="Left" x:Name="BtnEventLogsLog" Content="Журнал"
+                            Style="{StaticResource SecondaryButton}" MinWidth="96"
+                            Click="BtnEventLogsLog_Click"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button x:Name="BtnEventLogsSelect" Content="Выбрать все" Style="{StaticResource SecondaryButton}"
+                                MinWidth="108" Margin="0,0,8,0" Click="EventLogsSelectAll_Click"/>
+                        <Button x:Name="BtnEventLogsDeselect" Content="Снять все" Style="{StaticResource SecondaryButton}"
+                                MinWidth="108" Margin="0,0,8,0" Click="EventLogsDeselect_Click"/>
+                        <Button x:Name="BtnEventLogsEvents" Content="События" Style="{StaticResource SecondaryButton}"
+                                MinWidth="108" Margin="0,0,8,0" Click="EventLogsEvents_Click"
+                                ToolTip="Просмотр записей выбранного канала (или двойной клик по строке)"/>
+                        <Button x:Name="BtnEventLogsRefresh" Content="Обновить" Style="{StaticResource PrimaryButton}"
+                                MinWidth="124" Margin="0,0,8,0" Click="EventLogsRefresh_Click"/>
+                        <Button x:Name="BtnEventLogsClear" Content="Очистить выбранные" Style="{StaticResource DangerButton}"
+                                MinWidth="168" Click="EventLogsClear_Click"/>
                     </StackPanel>
                 </DockPanel>
             </Border>

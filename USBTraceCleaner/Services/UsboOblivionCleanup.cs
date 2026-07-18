@@ -110,93 +110,63 @@ public static class UsboOblivionCleanup
 
 
     public static int CleanMountedDevices(CleanupOptions options, Action<string>? log = null)
-
     {
-
         if (options.SimulationMode) return 0;
 
-
-
         const string path = @"SYSTEM\MountedDevices";
-
         var driveMask = RegistryHelper.GetConnectedDriveMask();
-
-        var values = new List<string>();
-
-
+        var toDelete = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         RegistryHelper.SafeOpen(mdKey =>
-
         {
-
+            var values = new List<(string Name, byte[] Data)>();
             foreach (var valueName in mdKey.GetValueNames())
-
             {
-
-                var data = mdKey.GetValue(valueName) as byte[];
-
-                if (data == null) continue;
-
-
-
-                var text = System.Text.Encoding.Unicode.GetString(data);
-
-                if (!text.Contains("USBSTOR#Disk", StringComparison.OrdinalIgnoreCase)
-
-                    && !text.Contains("USBSTOR#CdRom", StringComparison.OrdinalIgnoreCase)
-
-                    && !text.Contains("STORAGE#RemovableMedia", StringComparison.OrdinalIgnoreCase))
-
-                    continue;
-
-
-
-                if (valueName.StartsWith(@"\DosDevices\", StringComparison.OrdinalIgnoreCase)
-
-                    && valueName.Length >= 13)
-
-                {
-
-                    var letter = valueName[12];
-
-                    if (RegistryHelper.IsDriveConnected(driveMask, letter))
-
-                        continue;
-
-                }
-
-
-
-                values.Add(valueName);
-
+                if (mdKey.GetValue(valueName) is byte[] data)
+                    values.Add((valueName, data));
             }
 
+            foreach (var (valueName, data) in values)
+            {
+                if (!ForensicTracePatterns.IsMountedDevicesUsbData(data))
+                    continue;
+
+                if (valueName.StartsWith(@"\DosDevices\", StringComparison.OrdinalIgnoreCase)
+                    && valueName.Length >= 13
+                    && RegistryHelper.IsDriveConnected(driveMask, valueName[12]))
+                    continue;
+
+                toDelete.Add(valueName);
+            }
+
+            // Orphan буквы (H: и т.п.) + парный Volume{guid} с теми же данными
+            foreach (var (valueName, data) in values)
+            {
+                if (!ForensicTracePatterns.IsOrphanDosDeviceLetterName(valueName, driveMask))
+                    continue;
+
+                toDelete.Add(valueName);
+                foreach (var (otherName, otherData) in values)
+                {
+                    if (!otherName.StartsWith(@"\??\Volume{", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    if (otherData.AsSpan().SequenceEqual(data))
+                        toDelete.Add(otherName);
+                }
+            }
         }, RegistryHive.LocalMachine, path);
 
+        if (toDelete.Count == 0) return 0;
 
-
-        if (values.Count == 0) return 0;
-
-
-
-        log?.Invoke($"  MountedDevices: значений к удалению: {values.Count}");
-
+        log?.Invoke($"  MountedDevices: значений к удалению: {toDelete.Count}");
         var failed = 0;
-
-        foreach (var valueName in values)
-
+        foreach (var valueName in toDelete)
         {
-
             if (!RegistryHelper.DeleteValue(RegistryHive.LocalMachine, path, valueName, false, log))
-
                 failed++;
-
         }
 
-
-
         return failed;
-
     }
 
 

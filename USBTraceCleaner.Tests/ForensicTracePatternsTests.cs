@@ -61,4 +61,69 @@ public class ForensicTracePatternsTests
         Assert.True(ForensicTracePatterns.IsUsbOrSelfTrace("USBTraceCleaner.exe"));
         Assert.False(ForensicTracePatterns.ContainsSelfTraceToken("chrome.exe"));
     }
+
+    [Theory]
+    [InlineData("SWD#WPDBUSENUM#_??_USBSTOR#Disk&Ven_General&Prod_UDisk", true)]
+    [InlineData("SWD#WPDBUSENUM#something", true)]
+    [InlineData("SomeBluetoothDevice", false)]
+    [InlineData("", false)]
+    public void IsWindowsPortableDeviceUsbChild(string name, bool expected) =>
+        Assert.Equal(expected, ForensicTracePatterns.IsWindowsPortableDeviceUsbChild(name));
+
+    [Theory]
+    [InlineData("USBSTOR", true)]
+    [InlineData("UASPStor", true)]
+    [InlineData("WUDFWpdMtp", true)]
+    [InlineData("HidUsb", false)]
+    [InlineData("usbvideo", false)]
+    [InlineData(null, false)]
+    public void IsRemovableUsbService(string? service, bool expected) =>
+        Assert.Equal(expected, ForensicTracePatterns.IsRemovableUsbService(service));
+
+    [Theory]
+    [InlineData(@"\??\USBSTOR#Disk&Ven_General&Prod_UDisk#123", true)]
+    [InlineData(@"\??\SWD#WPDBUSENUM#_??_USBSTOR#Disk&Ven_X", true)]
+    [InlineData(@"C:\Windows\System32", false)]
+    [InlineData("", false)]
+    public void IsMountedDevicesUsbPath(string path, bool expected) =>
+        Assert.Equal(expected, ForensicTracePatterns.IsMountedDevicesUsbPath(path));
+
+    [Fact]
+    public void IsMountedDevicesUsbData_Utf16UsbStor()
+    {
+        var bytes = System.Text.Encoding.Unicode.GetBytes(
+            @"\??\USBSTOR#Disk&Ven_General&Prod_UDiskRev_5.00#6cadd1461_0");
+        Assert.True(ForensicTracePatterns.IsMountedDevicesUsbData(bytes));
+        Assert.False(ForensicTracePatterns.IsMountedDevicesUsbData(
+            System.Text.Encoding.Unicode.GetBytes(@"\??\SCSI#Disk&Ven_NVMe")));
+    }
+
+    [Theory]
+    [InlineData(@"\DosDevices\H:", 0, true)]
+    [InlineData(@"\DosDevices\C:", 0, false)]
+    [InlineData(@"\??\Volume{abc}", 0, false)]
+    public void IsOrphanDosDeviceLetterName(string name, int mask, bool expected) =>
+        Assert.Equal(expected, ForensicTracePatterns.IsOrphanDosDeviceLetterName(name, mask));
+
+    [Fact]
+    public void IsJumpListContentOfInterest_UsbOnly_NotEverything()
+    {
+        // driveMask=0 → все буквы D–Z считаются «отключёнными» removable
+        Assert.True(ForensicTracePatterns.IsJumpListContentOfInterest(
+            @"E:\photos\IMG_001.jpg", connectedDriveMask: 0, includeSelfTraces: false));
+        Assert.True(ForensicTracePatterns.IsJumpListContentOfInterest(
+            "USBSTOR#Disk&Ven_General", connectedDriveMask: 0, includeSelfTraces: false));
+        Assert.True(ForensicTracePatterns.IsJumpListContentOfInterest(
+            "General UDisk volume", connectedDriveMask: 0, includeSelfTraces: false));
+
+        Assert.False(ForensicTracePatterns.IsJumpListContentOfInterest(
+            @"C:\Users\adm\Documents\report.docx", connectedDriveMask: 0, includeSelfTraces: false));
+        Assert.False(ForensicTracePatterns.IsJumpListContentOfInterest(
+            "chrome.exe recent file", connectedDriveMask: 0, includeSelfTraces: false));
+
+        Assert.True(ForensicTracePatterns.IsJumpListContentOfInterest(
+            "USBTraceCleaner.exe", connectedDriveMask: 0, includeSelfTraces: true));
+        Assert.False(ForensicTracePatterns.IsJumpListContentOfInterest(
+            "USBTraceCleaner.exe", connectedDriveMask: 0, includeSelfTraces: false));
+    }
 }

@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace USBTraceCleaner.Services;
@@ -21,8 +22,64 @@ public static class ForensicTracePatterns
 
     public static IReadOnlyList<string> SelfExecutableNames => SelfExeNames;
 
+    private static readonly string[] RemovableUsbServices =
+    [
+        "USBSTOR",
+        "UASPStor",
+        "WUDFWpdMtp",
+        "WUDFRd",
+        "WpdUpFltr",
+    ];
+
     public static bool ContainsUsbStorageToken(string? text) =>
         !string.IsNullOrEmpty(text) && UsbStorToken.IsMatch(text);
+
+    /// <summary>
+    /// Данные значения HKLM\SYSTEM\MountedDevices относятся к USB/WPD-накопителю.
+    /// Раньше ловили только USBSTOR#Disk — из‑за этого оставались H: / Volume{…} от WPD.
+    /// </summary>
+    public static bool IsMountedDevicesUsbData(byte[]? data)
+    {
+        if (data is null || data.Length == 0) return false;
+
+        var utf16 = Encoding.Unicode.GetString(data).TrimEnd('\0');
+        if (IsMountedDevicesUsbPath(utf16)) return true;
+
+        var ascii = Encoding.ASCII.GetString(data).TrimEnd('\0');
+        return IsMountedDevicesUsbPath(ascii);
+    }
+
+    public static bool IsMountedDevicesUsbPath(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return false;
+        if (ContainsUsbStorageToken(text)) return true;
+        if (text.Contains("UDisk", StringComparison.OrdinalIgnoreCase)) return true;
+        if (text.Contains(@"\USBSTOR", StringComparison.OrdinalIgnoreCase)) return true;
+        if (text.Contains("SWD#WPDBUSENUM", StringComparison.OrdinalIgnoreCase)) return true;
+        if (text.Contains("WPDBUSENUM", StringComparison.OrdinalIgnoreCase)) return true;
+        if (text.Contains("WpdMtp", StringComparison.OrdinalIgnoreCase)) return true;
+        // Disk&Ven_ только вместе с USB-префиксом (не SCSI/NVMe)
+        if (text.Contains("Disk&Ven_", StringComparison.OrdinalIgnoreCase)
+            && (text.Contains("USBSTOR", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("USB#", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("UASP", StringComparison.OrdinalIgnoreCase)))
+            return true;
+        return false;
+    }
+
+    /// <summary>
+    /// Отключённая буква D–Z в MountedDevices: кандидат на orphan-очистку
+    /// (вместе с парным \??\Volume{guid} с теми же байтами).
+    /// </summary>
+    public static bool IsOrphanDosDeviceLetterName(string? valueName, int connectedDriveMask)
+    {
+        if (string.IsNullOrEmpty(valueName)) return false;
+        if (!valueName.StartsWith(@"\DosDevices\", StringComparison.OrdinalIgnoreCase)) return false;
+        if (valueName.Length < 13) return false;
+        var letter = char.ToUpperInvariant(valueName[12]);
+        if (letter is < 'D' or > 'Z') return false;
+        return !RegistryHelper.IsDriveConnected(connectedDriveMask, letter);
+    }
 
     public static bool ContainsSelfTraceToken(string? text)
     {
@@ -37,6 +94,41 @@ public static class ForensicTracePatterns
 
     public static bool IsUsbOrSelfTrace(string? text) =>
         ContainsUsbStorageToken(text) || ContainsSelfTraceToken(text);
+
+    /// <summary>
+    /// Jump List / Recent binary blob относится к USB-накопителю или (опционально) self-trace.
+    /// Не включает «все файлы папки» — только содержательные совпадения.
+    /// </summary>
+    public static bool IsJumpListContentOfInterest(string? text, int connectedDriveMask, bool includeSelfTraces)
+    {
+        if (string.IsNullOrEmpty(text)) return false;
+        if (ContainsUsbStorageToken(text)) return true;
+        if (MatchesRemovableDriveLetter(text, connectedDriveMask)) return true;
+        if (text.Contains("UDisk", StringComparison.OrdinalIgnoreCase)) return true;
+        if (text.Contains("Mass Storage", StringComparison.OrdinalIgnoreCase)) return true;
+        if (includeSelfTraces && ContainsSelfTraceToken(text)) return true;
+        return false;
+    }
+
+    /// <summary>Дочерний ключ Windows Portable Devices\Devices связан с USB/WPD-накопителем.</summary>
+    public static bool IsWindowsPortableDeviceUsbChild(string? deviceKeyName) =>
+        !string.IsNullOrEmpty(deviceKeyName) && (
+            ContainsUsbStorageToken(deviceKeyName)
+            || deviceKeyName.Contains("UDisk", StringComparison.OrdinalIgnoreCase)
+            || deviceKeyName.Contains("USBSTOR", StringComparison.OrdinalIgnoreCase)
+            || deviceKeyName.Contains("WPDBUSENUM", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>PnP Service относится к съёмному USB-накопителю / MTP, а не к onboard HID/UVC/BT.</summary>
+    public static bool IsRemovableUsbService(string? service)
+    {
+        if (string.IsNullOrEmpty(service)) return false;
+        foreach (var name in RemovableUsbServices)
+        {
+            if (service.Equals(name, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
+    }
 
     public static bool IsPrefetchOfInterest(string fileName)
     {

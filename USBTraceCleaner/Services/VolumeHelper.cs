@@ -1,6 +1,5 @@
-using System.Diagnostics;
-using System.IO;
 using System.Diagnostics.CodeAnalysis;
+using System.IO;
 
 namespace USBTraceCleaner.Services;
 
@@ -20,17 +19,18 @@ public static class VolumeHelper
             }
             """;
 
-        var psi = new ProcessStartInfo("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script])
+        var result = ProcessExec.Run(
+            "powershell.exe",
+            ["-NoProfile", "-NonInteractive", "-Command", script],
+            15_000);
+
+        if (result.TimedOut)
         {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true
-        };
-        using var proc = Process.Start(psi);
-        if (proc == null) return;
-        proc.WaitForExit(15000);
-        var output = proc.StandardOutput.ReadToEnd();
-        foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            log?.Invoke("  [WARN] Offline USB disks: таймаут powershell");
+            return;
+        }
+
+        foreach (var line in result.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             log?.Invoke($"  {line.Trim()}");
     }
 

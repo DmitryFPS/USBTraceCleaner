@@ -1,7 +1,6 @@
-using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Microsoft.Win32;
-using System.Diagnostics.CodeAnalysis;
 
 namespace USBTraceCleaner.Services;
 
@@ -24,26 +23,11 @@ public static class RegistryQueryHelper
         var hivePrefix = GetHivePrefix(hive);
         var fullPath = $"{prefix}\\{subKey}";
 
-        var psi = new ProcessStartInfo("reg.exe", $"query \"{fullPath}\"")
-        {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            StandardOutputEncoding = Encoding.Default
-        };
-
-        using var proc = Process.Start(psi);
-        if (proc == null) return [];
-
-        var output = proc.StandardOutput.ReadToEnd();
-        if (!proc.WaitForExit(30000))
-        {
-            try { proc.Kill(true); } catch { }
+        var result = ProcessExec.Run("reg.exe", $"query \"{fullPath}\"", 30_000, Encoding.Default);
+        if (result.TimedOut || string.IsNullOrEmpty(result.StdOut))
             return [];
-        }
 
-        return ParseImmediateChildrenFromRegQuery(output, hivePrefix, subKey);
+        return ParseImmediateChildrenFromRegQuery(result.StdOut, hivePrefix, subKey);
     }
 
     /// <summary>
@@ -55,26 +39,11 @@ public static class RegistryQueryHelper
         var hivePrefix = GetHivePrefix(hive);
         var fullPath = $"{prefix}\\{subKey}";
 
-        var psi = new ProcessStartInfo("reg.exe", $"query \"{fullPath}\" /s")
-        {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            StandardOutputEncoding = Encoding.Default
-        };
-
-        using var proc = Process.Start(psi);
-        if (proc == null) return [subKey];
-
-        var output = proc.StandardOutput.ReadToEnd();
-        if (!proc.WaitForExit(60000))
-        {
-            try { proc.Kill(true); } catch { }
+        var result = ProcessExec.Run("reg.exe", $"query \"{fullPath}\" /s", 60_000, Encoding.Default);
+        if (result.TimedOut || string.IsNullOrEmpty(result.StdOut))
             return [subKey];
-        }
 
-        return ParseKeyPathsFromRegQuery(output, hivePrefix, subKey);
+        return ParseKeyPathsFromRegQuery(result.StdOut, hivePrefix, subKey);
     }
 
     private static List<string> ParseKeyPathsFromRegQuery(string output, string hivePrefix, string subKey)

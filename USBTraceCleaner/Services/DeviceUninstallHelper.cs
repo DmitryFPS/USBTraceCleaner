@@ -91,21 +91,11 @@ public static class DeviceUninstallHelper
 
     private static bool TryPnPUtilRemove(string deviceInstanceId)
     {
-        var psi = new ProcessStartInfo("pnputil.exe", $"/remove-device \"{deviceInstanceId}\" /force")
-        {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        };
-        using var proc = Process.Start(psi);
-        if (proc == null) return false;
-        if (!proc.WaitForExit(15000))
-        {
-            try { proc.Kill(true); } catch { }
-            return false;
-        }
-        return proc.ExitCode == 0;
+        var result = ProcessExec.Run(
+            "pnputil.exe",
+            $"/remove-device \"{deviceInstanceId}\" /force",
+            15_000);
+        return result.Ok;
     }
 
     private static List<string> CollectUsbStorInstanceIds()

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
 namespace USBTraceCleaner.Services;
@@ -17,27 +16,13 @@ public static class VolumeShadowCopyCleaner
         log?.Invoke("--- Удаление Volume Shadow Copies (VSS) ---");
         try
         {
-            var psi = new ProcessStartInfo("vssadmin.exe", "delete shadows /all /quiet")
-            {
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-            using var proc = Process.Start(psi);
-            if (proc == null)
-            {
-                log?.Invoke("[FAIL] vssadmin не запустился");
-                return;
-            }
-
-            var stdout = proc.StandardOutput.ReadToEnd();
-            var stderr = proc.StandardError.ReadToEnd();
-            proc.WaitForExit(120000);
-            if (proc.ExitCode == 0)
+            var result = ProcessExec.Run("vssadmin.exe", "delete shadows /all /quiet", 120_000);
+            if (result.Ok)
                 log?.Invoke("[OK]  VSS shadows удалены");
+            else if (result.TimedOut)
+                log?.Invoke("[WARN] vssadmin: таймаут");
             else
-                log?.Invoke($"[WARN] vssadmin exit={proc.ExitCode}: {Trim(stdout + stderr)}");
+                log?.Invoke($"[WARN] vssadmin exit={result.ExitCode}: {Trim(result.Combined)}");
         }
         catch (Exception ex)
         {

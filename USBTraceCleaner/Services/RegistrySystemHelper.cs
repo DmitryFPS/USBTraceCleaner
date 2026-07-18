@@ -83,20 +83,7 @@ public static class RegistrySystemHelper
 
     private static int Run(string file, string arguments)
     {
-        var psi = new ProcessStartInfo(file, arguments)
-        {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        };
-        using var proc = Process.Start(psi);
-        if (proc == null) return -1;
-        if (!proc.WaitForExit(30000))
-        {
-            try { proc.Kill(true); } catch { }
-            return -1;
-        }
-        return proc.ExitCode;
+        var result = ProcessExec.Run(file, arguments, 30_000);
+        return result.TimedOut ? -1 : result.ExitCode;
     }
 }

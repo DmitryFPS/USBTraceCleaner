@@ -12,28 +12,8 @@ internal static class EventLogChannelHelper
 
         try
         {
-            using var proc = new System.Diagnostics.Process
-            {
-                StartInfo = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "wevtutil",
-                    Arguments = $"gl \"{channel}\"",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                }
-            };
-            proc.Start();
-            var stdout = proc.StandardOutput.ReadToEnd();
-            var stderr = proc.StandardError.ReadToEnd();
-            proc.WaitForExit(15000);
-
-            if (proc.ExitCode == 0)
-                return true;
-
-            // Канал не найден (RU/EN) или другая ошибка — не добавляем в очистку
-            return false;
+            var result = ProcessExec.Run("wevtutil", $"gl \"{channel}\"", 15_000);
+            return result.Ok;
         }
         catch
         {

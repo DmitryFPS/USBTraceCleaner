@@ -146,6 +146,10 @@ public static class PnPGhostScanner
             if (marked.Contains(entry.RegistryPath))
                 continue;
 
+            // Только съёмные USBSTOR/MTP; onboard HID/UVC/BT не трогаем даже как «orphan»
+            if (!ForensicTracePatterns.IsRemovableUsbService(entry.Service))
+                continue;
+
             if (!DeviceUninstallHelper.IsDevicePresent(entry.DeviceInstanceId))
             {
                 result.Add(entry with { Kind = GhostKind.Orphan, KeeperDeviceId = null });
@@ -208,13 +212,20 @@ public static class PnPGhostScanner
                         foreach (var instance in vidRegKey.GetSubKeyNames())
                         {
                             var regPath = $@"{vidPath}\{instance}";
+                            var service = RegistryHelper.GetStringValueAt(
+                                RegistryHive.LocalMachine, regPath, "Service");
+
+                            // Дубликаты/призраки только для накопителей и MTP
+                            if (!ForensicTracePatterns.IsRemovableUsbService(service))
+                                continue;
+
                             entries.Add(new GhostEntry(
                                 controlSet,
                                 vidName,
                                 instance,
                                 regPath,
                                 UsbInstanceParser.ToDeviceInstanceId(vidName, instance),
-                                RegistryHelper.GetStringValueAt(RegistryHive.LocalMachine, regPath, "Service"),
+                                service,
                                 GhostKind.Orphan,
                                 null));
                         }

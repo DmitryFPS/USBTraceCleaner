@@ -124,16 +124,7 @@ public static class AmcacheCleaner
 
     private static int RunReg(string args)
     {
-        var psi = new ProcessStartInfo("reg.exe", args)
-        {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        };
-        using var proc = Process.Start(psi);
-        if (proc == null) return -1;
-        proc.WaitForExit(60000);
-        return proc.ExitCode;
+        var result = ProcessExec.Run("reg.exe", args, 60_000);
+        return result.TimedOut ? -1 : result.ExitCode;
     }
 }

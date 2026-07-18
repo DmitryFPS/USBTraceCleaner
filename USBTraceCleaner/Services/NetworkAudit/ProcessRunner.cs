@@ -1,8 +1,7 @@
-using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
 using USBTraceCleaner.Models;
-using System.Diagnostics.CodeAnalysis;
 
 namespace USBTraceCleaner.Services.NetworkAudit;
 
@@ -15,31 +14,10 @@ internal static class ProcessRunner
                          || fileName.Equals("pwsh", StringComparison.OrdinalIgnoreCase);
         var encoding = preferUtf8 ? Encoding.UTF8 : GetConsoleEncoding();
 
-        using var proc = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = fileName,
-                Arguments = arguments,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-                StandardOutputEncoding = encoding,
-                StandardErrorEncoding = encoding
-            }
-        };
-
-        proc.Start();
-
-        var stdoutTask = proc.StandardOutput.ReadToEndAsync();
-        var stderrTask = proc.StandardError.ReadToEndAsync();
-        proc.WaitForExit(timeoutMs);
-        Task.WaitAll(stdoutTask, stderrTask);
-
-        var output = stdoutTask.Result;
-        if (string.IsNullOrWhiteSpace(output))
-            output = stderrTask.Result;
+        var result = ProcessExec.Run(fileName, arguments, timeoutMs, encoding);
+        var output = string.IsNullOrWhiteSpace(result.StdOut) ? result.StdErr : result.StdOut;
+        if (result.TimedOut && string.IsNullOrWhiteSpace(output))
+            output = "таймаут процесса";
 
         return NetworkAuditDisplay.SanitizeForDisplay(output);
     }
@@ -62,33 +40,21 @@ internal static class ProcessRunner
 
         try
         {
-            using var proc = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = "wevtutil",
-                    Arguments = $"cl \"{channel}\"",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                }
-            };
-            proc.Start();
-            var stdout = proc.StandardOutput.ReadToEnd();
-            var err = proc.StandardError.ReadToEnd();
-            proc.WaitForExit(30000);
-            if (proc.ExitCode == 0)
+            var result = ProcessExec.Run("wevtutil", $"cl \"{channel}\"", 30_000);
+            if (result.Ok)
                 return EventLogClearResult.Success;
 
-            var combined = $"{err}\n{stdout}";
-            if (EventLogChannelHelper.IsChannelNotFound(combined))
+            if (EventLogChannelHelper.IsChannelNotFound(result.Combined))
             {
                 error = "канал отсутствует в Windows";
                 return EventLogClearResult.SkippedNotFound;
             }
 
-            error = string.IsNullOrWhiteSpace(err) ? $"код {proc.ExitCode}" : err.Trim();
+            error = result.TimedOut
+                ? "таймаут wevtutil"
+                : string.IsNullOrWhiteSpace(result.StdErr)
+                    ? $"код {result.ExitCode}"
+                    : result.StdErr.Trim();
             return EventLogClearResult.Failed;
         }
         catch (Exception ex)

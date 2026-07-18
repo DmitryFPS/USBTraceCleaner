@@ -42,7 +42,7 @@ public sealed class ArtifactScanner
         @"SYSTEM\Setup\Upgrade",
         @"SYSTEM\Setup\SetupapiLogStatus",
         @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\EMDMgmt",
-        @"SOFTWARE\Microsoft\Windows Portable Devices\Devices",
+        // Windows Portable Devices\Devices — только дочерние USB/WPD (см. ScanPortableDevicesChildren)
         @"SOFTWARE\Microsoft\Windows Search\VolumeInfoCache",
         @"SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache",
     ];
@@ -451,6 +451,8 @@ public sealed class ArtifactScanner
         foreach (var key in StaticHklmKeys)
             AddKey(items, ArtifactCategory.RegistrySystem, key);
 
+        ScanPortableDevicesChildren(items);
+
         foreach (var (subKey, contains) in StaticHklmValues)
         {
             RegistryHelper.SafeOpen(key =>
@@ -465,32 +467,80 @@ public sealed class ArtifactScanner
         }
     }
 
+    /// <summary>
+    /// Удаляем дочерние записи USB/WPD под Devices, но не сам родительский ключ
+    /// (полная очистка следов флешек без «источник отсутствует» для всего WPD).
+    /// </summary>
+    private static void ScanPortableDevicesChildren(ConcurrentBag<ArtifactItem> items)
+    {
+        const string path = @"SOFTWARE\Microsoft\Windows Portable Devices\Devices";
+        RegistryHelper.SafeOpen(devicesKey =>
+        {
+            foreach (var child in devicesKey.GetSubKeyNames())
+            {
+                if (!ForensicTracePatterns.IsWindowsPortableDeviceUsbChild(child))
+                    continue;
+
+                AddKey(
+                    items,
+                    ArtifactCategory.RegistrySystem,
+                    $@"{path}\{child}",
+                    "Windows Portable Devices — USB/WPD устройство");
+            }
+        }, RegistryHive.LocalMachine, path);
+    }
+
     private static void ScanMountedDevices(ConcurrentBag<ArtifactItem> items, int driveMask)
     {
         const string path = @"SYSTEM\MountedDevices";
         RegistryHelper.SafeOpen(mdKey =>
         {
+            var values = new List<(string Name, byte[] Data)>();
             foreach (var valueName in mdKey.GetValueNames())
             {
-                var data = mdKey.GetValue(valueName) as byte[];
-                if (data == null) continue;
+                if (mdKey.GetValue(valueName) is byte[] data)
+                    values.Add((valueName, data));
+            }
 
-                var text = Encoding.Unicode.GetString(data);
-                var isUsb = text.Contains("USBSTOR#Disk", StringComparison.OrdinalIgnoreCase) ||
-                            text.Contains("USBSTOR#CdRom", StringComparison.OrdinalIgnoreCase) ||
-                            text.Contains("STORAGE#RemovableMedia", StringComparison.OrdinalIgnoreCase);
+            var selected = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-                if (!isUsb) continue;
+            foreach (var (valueName, data) in values)
+            {
+                if (!ForensicTracePatterns.IsMountedDevicesUsbData(data))
+                    continue;
 
-                // Skip connected drive letters
                 if (valueName.StartsWith(@"\DosDevices\", StringComparison.OrdinalIgnoreCase) &&
-                    valueName.Length >= 13)
-                {
-                    var letter = valueName[12];
-                    if (RegistryHelper.IsDriveConnected(driveMask, letter)) continue;
-                }
+                    valueName.Length >= 13 &&
+                    RegistryHelper.IsDriveConnected(driveMask, valueName[12]))
+                    continue;
 
-                AddValue(items, ArtifactCategory.RegistryMounted, path, valueName, "Том USB в MountedDevices");
+                selected.Add(valueName);
+            }
+
+            // Буква отключена (как H: после флешки/WPD) + парный Volume{guid} с теми же байтами
+            foreach (var (valueName, data) in values)
+            {
+                if (!ForensicTracePatterns.IsOrphanDosDeviceLetterName(valueName, driveMask))
+                    continue;
+
+                selected.Add(valueName);
+                foreach (var (otherName, otherData) in values)
+                {
+                    if (!otherName.StartsWith(@"\??\Volume{", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    if (otherData.AsSpan().SequenceEqual(data))
+                        selected.Add(otherName);
+                }
+            }
+
+            foreach (var valueName in selected)
+            {
+                AddValue(
+                    items,
+                    ArtifactCategory.RegistryMounted,
+                    path,
+                    valueName,
+                    "Том USB/WPD или orphan-буква в MountedDevices");
             }
         }, RegistryHive.LocalMachine, path);
     }
@@ -673,28 +723,30 @@ public sealed class ArtifactScanner
 
                 foreach (var jumplist in Directory.EnumerateFiles(destDir))
                 {
-                    var include = true;
-                    if (options.CleanSelfTraces)
+                    // Только Jump Lists с USB/self-содержимым — не все файлы папки
+                    try
                     {
-                        try
-                        {
-                            var bytes = File.ReadAllBytes(jumplist);
-                            var text = Encoding.Unicode.GetString(bytes);
-                            include = ForensicTracePatterns.IsUsbOrSelfTrace(text)
-                                      || ForensicTracePatterns.MatchesRemovableDriveLetter(text, driveMask)
-                                      || options.CleanRecentLinks; // при включённых Jump Lists — все файлы папки
-                        }
-                        catch { include = true; }
+                        var bytes = File.ReadAllBytes(jumplist);
+                        var utf16 = Encoding.Unicode.GetString(bytes);
+                        var ascii = Encoding.ASCII.GetString(bytes);
+                        var include =
+                            ForensicTracePatterns.IsJumpListContentOfInterest(
+                                utf16, driveMask, options.CleanSelfTraces)
+                            || ForensicTracePatterns.IsJumpListContentOfInterest(
+                                ascii, driveMask, options.CleanSelfTraces);
+                        if (!include) continue;
                     }
-
-                    if (!include) continue;
+                    catch
+                    {
+                        continue;
+                    }
 
                     items.Add(new ArtifactItem
                     {
                         Category = ArtifactCategory.FileSystem,
                         Type = ArtifactType.File,
                         Location = jumplist,
-                        Description = $"Jump List ({folder})"
+                        Description = $"Jump List ({folder}) — USB / self-trace"
                     });
                 }
             }

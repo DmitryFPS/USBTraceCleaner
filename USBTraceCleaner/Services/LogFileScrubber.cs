@@ -9,14 +9,16 @@ namespace USBTraceCleaner.Services;
 [ExcludeFromCodeCoverage]
 public static class LogFileScrubber
 {
+    // Паттерны следов накопителей. Без голого "USB#" / "disk.inf" / "Flash" —
+    // они вычищали onboard и несвязанные disk-install; USB\VID_ и USBSTOR остаются для полной очистки флешек.
     private static readonly string[] UsbLinePatterns =
     [
-        "USBSTOR", "UASPStor", "USB\\VID_", "USB#VID", "USB#",
+        "USBSTOR", "UASPStor", "USB\\VID_", "USB#VID",
         "STORAGE\\RemovableMedia", "STORAGE#RemovableMedia",
         "RemovableMedia", "Ven_General", "Ven_Kingston", "Ven_ASUS",
         "Disk&Ven_", "CdRom&Ven_", "WPDBUSENUM", "WpdMtp",
-        "usbstor.inf", "uaspstor.inf", "disk.inf",
-        "USB-накопитель", "Mass Storage", "Flash", "UDisk"
+        "usbstor.inf", "uaspstor.inf",
+        "USB-накопитель", "Mass Storage", "UDisk"
     ];
 
     private static readonly string[] CriticalInfLogs =

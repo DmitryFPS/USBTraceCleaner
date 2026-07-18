@@ -57,7 +57,7 @@
 - `setupapi.dev.log`, `setupapi.ev*`
 - `INFCACHE.1`, PCA-логи Win11
 - Recent `.lnk` (USB + self-trace)
-- Jump Lists: `AutomaticDestinations`, `CustomDestinations`
+- Jump Lists: `AutomaticDestinations`, `CustomDestinations` (только с USB/self-содержимым)
 - Prefetch (`*.pf` по USB/утилитам)
 - Amcache.hve (scrub Inventory)
 - `$Recycle.Bin` ($I/$R с USB-путями)
@@ -68,6 +68,7 @@
 - Storage-ClassPnP, WPD-MTPClassDriver, Partition/Diagnostic
 - UserPnp/DeviceInstall, UserPnp/Operational
 - **System** (UserPnp USBSTOR + повторная очистка Event ID 104)
+- Вкладка **«Журналы событий»**: просмотр каналов (как Event Viewer) и полная очистка выбранных (`wevtutil cl`). Журнал «Безопасность» — только по отдельной галочке.
 
 ### Self-trace
 - Prefetch/BAM/Recent/Jump Lists для USBTraceCleaner, USBOblivion, USBDeview, USBDetector, UsbForensicAudit

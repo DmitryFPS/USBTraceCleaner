@@ -28,6 +28,8 @@ public partial class MainWindow : Window
     private bool _operationInProgress;
     private bool _isNetworkTab;
     private bool _isOtherUsbTab;
+    private bool _isEventLogsTab;
+    private string _activeEventLogGroup = WindowsEventLogBrowser.GroupAll;
     private ArtifactViewGroup _activeGroup = ArtifactViewGroup.All;
     private NetworkAuditFilterGroup _activeNetworkGroup = NetworkAuditFilterGroup.All;
     private ReportOperationType _lastUsbOperation = ReportOperationType.Scan;
@@ -59,11 +61,14 @@ public partial class MainWindow : Window
         NetworkView.OperationBusyChanged += NetworkSetBusy;
         OtherUsbView.OperationBusyChanged += OtherUsbSetBusy;
         OtherUsbView.CountChanged += _ => RefreshOtherUsbSidebar();
+        EventLogsView.OperationBusyChanged += EventLogsSetBusy;
+        EventLogsView.CategoriesChanged += EventLogsView_CategoriesChanged;
 
         TxtAppVersion.Text = $"версия {AppInfo.Version}";
 
         AppendLog($"Очистка следов USB {AppInfo.VersionLabel} — Windows 10/11");
         AppendLog("Вкладка «Другие USB-следы» — хабы, камеры, DeviceMigration (не флешки).");
+        AppendLog("Вкладка «Журналы событий» — просмотр и полная очистка каналов Event Viewer.");
         AppendLog("Перед очисткой отключите все USB-накопители.");
         AppendLog("Слева — категории; «Призраки / дубликаты» — лишние записи PnP.");
         AppendLog("«Сканировать» — показать следы. «Очистить» — удалить выбранное.");
@@ -263,6 +268,13 @@ public partial class MainWindow : Window
         if (_isOtherUsbTab)
             return;
 
+        if (_isEventLogsTab)
+        {
+            _activeEventLogGroup = selected.EventLogGroup;
+            EventLogsView.SetCategoryFilter(_activeEventLogGroup);
+            return;
+        }
+
         _activeGroup = selected.Group;
         _filteredView.Refresh();
         UpdateCount();
@@ -273,15 +285,23 @@ public partial class MainWindow : Window
         if (!_isReady || _operationInProgress) return;
         _isNetworkTab = MainTabs.SelectedIndex == 1;
         _isOtherUsbTab = MainTabs.SelectedIndex == 2;
-        UsbBottomBar.Visibility = _isNetworkTab || _isOtherUsbTab ? Visibility.Collapsed : Visibility.Visible;
+        _isEventLogsTab = MainTabs.SelectedIndex == 3;
+        var nonUsb = _isNetworkTab || _isOtherUsbTab || _isEventLogsTab;
+        UsbBottomBar.Visibility = nonUsb ? Visibility.Collapsed : Visibility.Visible;
         NetworkBottomBar.Visibility = _isNetworkTab ? Visibility.Visible : Visibility.Collapsed;
         OtherUsbBottomBar.Visibility = _isOtherUsbTab ? Visibility.Visible : Visibility.Collapsed;
+        EventLogsBottomBar.Visibility = _isEventLogsTab ? Visibility.Visible : Visibility.Collapsed;
         TxtSubtitle.Text = _isNetworkTab
             ? "Аудит и очистка сетевых следов"
             : _isOtherUsbTab
                 ? "USB не-накопители: как «Другие следы» в USBDetector"
-                : "Профессиональная очистка следов USB";
+                : _isEventLogsTab
+                    ? "Просмотр и очистка журналов Windows (Event Viewer)"
+                    : "Профессиональная очистка следов USB";
         RefreshSidebarCategories();
+
+        if (_isEventLogsTab && EventLogsView.ChannelCount == 0)
+            _ = EventLogsView.RefreshChannelsAsync();
     }
 
     private void NetworkView_CategoriesChanged(
@@ -338,6 +358,25 @@ public partial class MainWindow : Window
                 Count = OtherUsbView.ItemCount
             });
             LstCategories.SelectedIndex = 0;
+        }
+        else if (_isEventLogsTab)
+        {
+            var prev = _activeEventLogGroup;
+            foreach (var (group, label, count) in EventLogsView.GetCategoryCounts())
+            {
+                _categories.Add(new CategoryFilterItem
+                {
+                    EventLogGroup = group,
+                    Name = label,
+                    Count = count
+                });
+            }
+
+            var idx = _categories.ToList().FindIndex(c =>
+                c.EventLogGroup.Equals(prev, StringComparison.OrdinalIgnoreCase));
+            LstCategories.SelectedIndex = idx >= 0 ? idx : 0;
+            _activeEventLogGroup = idx >= 0 ? prev : WindowsEventLogBrowser.GroupAll;
+            EventLogsView.SetCategoryFilter(_activeEventLogGroup);
         }
         else
         {
@@ -532,6 +571,62 @@ public partial class MainWindow : Window
         BtnOtherUsbLog.IsEnabled = !busy;
     }
 
+    private void EventLogsView_CategoriesChanged(
+        string active,
+        IReadOnlyList<(string Group, string Label, int Count)> counts)
+    {
+        if (!_isEventLogsTab) return;
+
+        var prevGroup = active;
+        var wasReady = _isReady;
+        _isReady = false;
+
+        _categories.Clear();
+        foreach (var (group, label, count) in counts)
+        {
+            _categories.Add(new CategoryFilterItem
+            {
+                EventLogGroup = group,
+                Name = label,
+                Count = count
+            });
+        }
+
+        var idx = _categories.ToList().FindIndex(c =>
+            c.EventLogGroup.Equals(prevGroup, StringComparison.OrdinalIgnoreCase));
+        LstCategories.SelectedIndex = idx >= 0 ? idx : 0;
+        _activeEventLogGroup = idx >= 0 ? prevGroup : WindowsEventLogBrowser.GroupAll;
+
+        _isReady = wasReady;
+    }
+
+    private void BtnEventLogsLog_Click(object sender, RoutedEventArgs e) =>
+        LogWindow.ShowDialog(this, "Журнал — журналы событий", EventLogsView.GetLogText());
+
+    private async void EventLogsRefresh_Click(object sender, RoutedEventArgs e) =>
+        await EventLogsView.RefreshChannelsAsync();
+
+    private async void EventLogsClear_Click(object sender, RoutedEventArgs e) =>
+        await EventLogsView.ClearSelectedAsync(this);
+
+    private void EventLogsSelectAll_Click(object sender, RoutedEventArgs e) => EventLogsView.SelectAll();
+
+    private void EventLogsDeselect_Click(object sender, RoutedEventArgs e) => EventLogsView.DeselectAll();
+
+    private void EventLogsEvents_Click(object sender, RoutedEventArgs e) =>
+        EventLogsView.ShowSelectedEvents(this);
+
+    private void EventLogsSetBusy(bool busy)
+    {
+        SetOperationChrome(busy);
+        BtnEventLogsRefresh.IsEnabled = !busy;
+        BtnEventLogsClear.IsEnabled = !busy;
+        BtnEventLogsSelect.IsEnabled = !busy;
+        BtnEventLogsDeselect.IsEnabled = !busy;
+        BtnEventLogsEvents.IsEnabled = !busy;
+        BtnEventLogsLog.IsEnabled = !busy;
+    }
+
     private void BtnNetworkLog_Click(object sender, RoutedEventArgs e) =>
         LogWindow.ShowDialog(this, "Журнал — аудит сети", NetworkView.GetLogText());
 
@@ -597,6 +692,7 @@ public partial class MainWindow : Window
     {
         public ArtifactViewGroup Group { get; init; } = ArtifactViewGroup.All;
         public NetworkAuditFilterGroup NetworkGroup { get; init; } = NetworkAuditFilterGroup.All;
+        public string EventLogGroup { get; init; } = WindowsEventLogBrowser.GroupAll;
         public string Name { get; init; } = string.Empty;
         public int Count { get; init; }
     }

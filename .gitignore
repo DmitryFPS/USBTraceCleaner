@@ -25,3 +25,8 @@ USBTraceCleaner_manifest_*.txt
 
 # Test coverage output
 TestResults/
+
+# Local scratch / audit export dumps
+_audit_export*
+_py_ver.txt
+_shell_test.txt

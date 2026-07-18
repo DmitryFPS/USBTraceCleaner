@@ -314,10 +314,34 @@ public sealed class ArtifactCleaner
             var usbStor = $@"SYSTEM\{controlSet}\Enum\USBSTOR";
             var count = RegistryHelper.CountSubKeys(RegistryHive.LocalMachine, usbStor);
             var exists = RegistryHelper.KeyExists(RegistryHive.LocalMachine, usbStor);
-            if (!exists || count == 0)
+            if (!exists)
+                Log($"  ✓ USBSTOR [{controlSet}]: ключ отсутствует (очищен или не создавался)");
+            else if (count == 0)
                 Log($"  ✓ USBSTOR [{controlSet}]: пусто");
             else
                 Log($"  ⚠ Осталось в USBSTOR [{controlSet}]: {count} записей");
+        }
+
+        const string wpdDevices = @"SOFTWARE\Microsoft\Windows Portable Devices\Devices";
+        if (!RegistryHelper.KeyExists(RegistryHive.LocalMachine, wpdDevices))
+        {
+            Log("  ✓ WPD Devices: ключ отсутствует");
+        }
+        else
+        {
+            var wpdLeft = 0;
+            RegistryHelper.SafeOpen(key =>
+            {
+                foreach (var child in key.GetSubKeyNames())
+                {
+                    if (ForensicTracePatterns.IsWindowsPortableDeviceUsbChild(child))
+                        wpdLeft++;
+                }
+            }, RegistryHive.LocalMachine, wpdDevices);
+
+            Log(wpdLeft == 0
+                ? "  ✓ WPD Devices: USB/WPD-записи накопителей не найдены (ключ сохранён)"
+                : $"  ⚠ WPD Devices: осталось USB/WPD-записей: {wpdLeft}");
         }
 
         if (_failCount > 0)
@@ -545,13 +569,7 @@ public sealed class ArtifactCleaner
     {
         try
         {
-            var psi = new ProcessStartInfo("wevtutil.exe", $"cl \"{channel}\"")
-            {
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            using var proc = Process.Start(psi);
-            proc?.WaitForExit(30000);
+            WindowsEventLogBrowser.ClearChannel(channel);
         }
         catch { /* channel may not exist */ }
     }
