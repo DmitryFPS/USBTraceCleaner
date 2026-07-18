@@ -49,19 +49,21 @@
     <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
   </ItemGroup>
 
-  <!-- Инженерное руководство: копируется рядом с EXE при build/publish -->
+  <!-- Engineering guide PDF from docs\ (wildcard avoids Cyrillic path encoding issues) -->
+  <ItemGroup>
+    <EngineeringGuidePdf Include="$(MSBuildProjectDirectory)\..\docs\USBTraceCleaner_*.pdf" />
+  </ItemGroup>
   <Target Name="CopyEngineeringGuide" AfterTargets="Build;Publish">
     <PropertyGroup>
-      <_GuideSource>$(MSBuildProjectDirectory)\..\docs\USBTraceCleaner_Инженерное_руководство.pdf</_GuideSource>
       <_GuideDestDir Condition="'$(PublishDir)' != ''">$(PublishDir)</_GuideDestDir>
       <_GuideDestDir Condition="'$(_GuideDestDir)' == ''">$(OutDir)</_GuideDestDir>
     </PropertyGroup>
-    <Copy SourceFiles="$(_GuideSource)"
+    <Copy SourceFiles="@(EngineeringGuidePdf)"
           DestinationFolder="$(_GuideDestDir)"
           SkipUnchangedFiles="true"
-          Condition="Exists('$(_GuideSource)')" />
-    <Warning Text="Engineering guide PDF not found: $(_GuideSource). Place USBTraceCleaner_Инженерное_руководство.pdf in docs\ before publish."
-             Condition="!Exists('$(_GuideSource)')" />
+          Condition="'@(EngineeringGuidePdf)' != ''" />
+    <Warning Text="Engineering guide PDF not found in docs\ (expected USBTraceCleaner_*.pdf)."
+             Condition="'@(EngineeringGuidePdf)' == ''" />
   </Target>
 
 </Project>

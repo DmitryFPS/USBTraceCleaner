@@ -16,16 +16,17 @@ public class EngineeringGuideTests
         throw new DirectoryNotFoundException("USBTraceCleaner.sln not found from test base directory.");
     }
 
+    private static string DocsDir => Path.Combine(FindRepoRoot(), "docs");
+
     [Fact]
     public void EngineeringGuide_HtmlAndPdf_ExistInDocs()
     {
-        var docs = Path.Combine(FindRepoRoot(), "docs");
-        var html = Path.Combine(docs, "USBTraceCleaner_Инженерное_руководство.html");
-        var pdf = Path.Combine(docs, "USBTraceCleaner_Инженерное_руководство.pdf");
+        var html = Directory.GetFiles(DocsDir, "USBTraceCleaner_*.html").FirstOrDefault();
+        var pdf = Directory.GetFiles(DocsDir, "USBTraceCleaner_*.pdf").FirstOrDefault();
 
-        Assert.True(File.Exists(html), $"Missing HTML guide: {html}");
-        Assert.True(File.Exists(pdf), $"Missing PDF guide: {pdf}");
-        Assert.True(new FileInfo(pdf).Length > 1000);
+        Assert.NotNull(html);
+        Assert.NotNull(pdf);
+        Assert.True(new FileInfo(pdf!).Length > 1000);
 
         var sig = File.ReadAllBytes(pdf).AsSpan(0, 4).ToArray();
         Assert.Equal("%PDF"u8.ToArray(), sig);
@@ -34,7 +35,7 @@ public class EngineeringGuideTests
     [Fact]
     public void EngineeringGuide_Html_HasNoKnownDiscrepanciesSection()
     {
-        var html = Path.Combine(FindRepoRoot(), "docs", "USBTraceCleaner_Инженерное_руководство.html");
+        var html = Directory.GetFiles(DocsDir, "USBTraceCleaner_*.html").Single();
         var text = File.ReadAllText(html);
         Assert.Contains("USBTraceCleaner", text);
         Assert.DoesNotContain("Известные расхождения текущей версии", text);
@@ -44,7 +45,7 @@ public class EngineeringGuideTests
     [Fact]
     public void EngineeringGuide_Html_DocumentsSimulationAndWhitelistProtection()
     {
-        var html = Path.Combine(FindRepoRoot(), "docs", "USBTraceCleaner_Инженерное_руководство.html");
+        var html = Directory.GetFiles(DocsDir, "USBTraceCleaner_*.html").Single();
         var text = File.ReadAllText(html);
         Assert.Contains("Симуляция (без удаления)", text);
         Assert.Contains("исключает их из очистки", text);
