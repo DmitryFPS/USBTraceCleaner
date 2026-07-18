@@ -216,7 +216,7 @@ public partial class MainWindow : Window
     {
         return new CleanupOptions
         {
-            SimulationMode = false,
+            SimulationMode = ChkSimulation.IsChecked == true,
             SaveBackup = ChkBackup.IsChecked == true,
             CreateRestorePoint = ChkRestorePoint.IsChecked == true,
             CloseExplorer = ChkCloseExplorer.IsChecked == true,

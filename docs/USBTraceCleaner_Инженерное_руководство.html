@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>USBTraceCleaner — инженерное руководство</title>
+<style>
+  @page { size: A4; margin: 17mm 15mm 18mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: #172033; font-size: 10.2pt; line-height: 1.48; }
+  h1 { font-size: 25pt; line-height: 1.12; margin: 0 0 10mm; color: #123a63; }
+  h2 { font-size: 17pt; margin: 10mm 0 4mm; color: #123a63; border-bottom: 1px solid #b9c7d5; padding-bottom: 2mm; break-after: avoid; }
+  h3 { font-size: 13pt; margin: 7mm 0 2.5mm; color: #174f80; break-after: avoid; }
+  h4 { font-size: 11pt; margin: 5mm 0 2mm; color: #263f59; break-after: avoid; }
+  p { margin: 0 0 3mm; }
+  ul, ol { margin: 1.5mm 0 4mm 6mm; padding-left: 5mm; }
+  li { margin: 1mm 0; }
+  a { color: #075b9b; text-decoration: none; overflow-wrap: anywhere; }
+  table { width: 100%; border-collapse: collapse; margin: 3mm 0 5mm; font-size: 9.1pt; break-inside: auto; }
+  tr { break-inside: avoid; }
+  th { background: #dce8f2; color: #173653; text-align: left; font-weight: 650; }
+  th, td { border: 1px solid #afbfce; padding: 2.1mm 2.4mm; vertical-align: top; }
+  code { font-family: Consolas, monospace; font-size: 8.8pt; background: #edf2f6; padding: 0.3mm 1mm; border-radius: 1mm; overflow-wrap: anywhere; }
+  .cover { min-height: 250mm; display: flex; flex-direction: column; justify-content: center; page-break-after: always; }
+  .subtitle { font-size: 15pt; color: #3a536b; max-width: 155mm; margin-bottom: 14mm; }
+  .meta { border-left: 4px solid #2b74a8; padding: 4mm 0 4mm 5mm; color: #41566a; }
+  .lead { font-size: 11.2pt; color: #31465b; }
+  .note, .warning, .critical, .sources { padding: 3mm 4mm; margin: 4mm 0; break-inside: avoid; }
+  .note { background: #edf5fb; border-left: 4px solid #2b74a8; }
+  .warning { background: #fff7df; border-left: 4px solid #d59b18; }
+  .critical { background: #fff0ee; border-left: 4px solid #b64a3b; }
+  .sources { background: #f3f6f8; border: 1px solid #ccd6df; font-size: 8.8pt; }
+  .sources b { color: #2f4f69; }
+  .feature { border: 1px solid #c6d2dc; padding: 4mm; margin: 5mm 0; break-inside: avoid-page; }
+  .feature h3 { margin-top: 0; }
+  .flow { display: grid; grid-template-columns: 1fr; gap: 2.4mm; margin: 5mm 0; }
+  .flow div { border: 1px solid #9fb6c8; background: #f4f8fb; padding: 3mm 4mm; break-inside: avoid; }
+  .flow b { color: #174f80; }
+  .arrow { text-align: center; color: #48718f; font-weight: 700; }
+  .toc a { display: block; padding: 1.2mm 0; border-bottom: 1px dotted #c4ced7; }
+  .tag { display: inline-block; padding: 0.5mm 1.8mm; border: 1px solid #9bb4c8; border-radius: 10px; margin: 0 1mm 1mm 0; font-size: 8.5pt; }
+  .page-break { page-break-before: always; }
+  .small { font-size: 8.6pt; color: #4d6174; }
+  .footer-note { margin-top: 10mm; font-size: 8pt; color: #687b8d; border-top: 1px solid #d4dde4; padding-top: 2mm; }
+</style>
+</head>
+<body>
+
+<section class="cover">
+  <div class="tag">Windows 10/11</div>
+  <div class="tag">USB / Type-C</div>
+  <div class="tag">Очистка артефактов</div>
+  <div class="tag">Инженерная эксплуатация</div>
+  <h1>USBTraceCleaner<br>Архитектура, принцип работы и безопасная эксплуатация</h1>
+  <div class="subtitle">Подробное руководство для инженера: что именно сканирует и удаляет приложение, зачем нужен каждый источник, как устроена модель безопасности и где заканчивается гарантированный результат очистки.</div>
+  <div class="meta">
+    <p><b>Назначение:</b> поиск и удаление следов USB/Type‑C устройств и связанных forensic‑артефактов на работающей Windows; дополнительно — аудит сети и универсальная очистка журналов событий.</p>
+    <p><b>Состояние проекта:</b> 18 июля 2026 года; версия приложения 1.7.1; руководство сверено с текущей архитектурой исходного кода.</p>
+    <p><b>Уровень:</b> Senior Engineer / DFIR-aware system engineer.</p>
+    <p><b>Принцип:</b> очистка — деструктивная операция. Приложение показывает, что нашло и что удаляет; оно не восстанавливает данные автоматически и не гарантирует, что Windows или сторонняя защита не воссоздадут часть следов после перезагрузки.</p>
+  </div>
+</section>
+
+<h2>Как пользоваться этим руководством</h2>
+<p class="lead">Документ отвечает не на вопрос «в каком классе написан метод», а на практические вопросы инженера: <b>что ищется, почему это удаляется, в каком порядке идёт очистка, какие гарантии даёт резервная копия и что нельзя утверждать после успешного «0 оставшихся USBSTOR»</b>.</p>
+<div class="critical"><b>Главное правило эксплуатации.</b> USBTraceCleaner — средство удаления артефактов, а не forensic‑аудит. Успешная очистка означает, что выбранные и доступные следы были удалены или перезаписаны в рамках реализованных шагов. Она не доказывает, что устройство «никогда не подключалось», и не отменяет необходимость образа диска, если исследование юридически значимо.</div>
+
+<div class="toc">
+  <a href="#purpose">1. Назначение и границы</a>
+  <a href="#architecture">2. Архитектура простыми словами</a>
+  <a href="#pipeline">3. Полный конвейер сканирования и очистки</a>
+  <a href="#functions">4. Что делает каждый функциональный блок</a>
+  <a href="#selection">5. Как выполняется отбор и классификация</a>
+  <a href="#safety">6. Модель безопасности, бэкап и проверка результата</a>
+  <a href="#network">7. Аудит сети</a>
+  <a href="#operation">8. Практический порядок работы инженера</a>
+  <a href="#storage">9. Хранение, отчёты и CLI</a>
+  <a href="#limits">10. Ограничения и запрещённые выводы</a>
+  <a href="#sources-list">11. Каталог проверенных источников</a>
+</div>
+
+<h2 id="purpose">1. Назначение и границы приложения</h2>
+<p><b>USBTraceCleaner</b> — локальная программа с графическим интерфейсом (GUI) для Windows 10/11. Она находит сохранившиеся следы USB‑накопителей и связанных forensic‑артефактов, позволяет выбрать элементы и удалить их с резервной копией реестра. Отдельные вкладки закрывают не‑storage USB‑следы, сетевые артефакты и универсальную работу с журналами Event Viewer.</p>
+<p>Приложение позиционируется как расширенный аналог USB Oblivion: ядро очистки реестра PnP/USBSTOR дополнено Prefetch, Amcache, Shimcache, Jump Lists, Recycle Bin, VSS, System log и удалением self‑trace утилит очистки.</p>
+
+<h3>Какие задачи приложение помогает закрыть</h3>
+<ul>
+  <li>Какие следы USB‑накопителей Windows хранит в реестре, логах и пользовательских профилях?</li>
+  <li>Каковы VID/PID, производитель, модель и дата первого подключения по PnP‑свойству?</li>
+  <li>Какие «призраки» PnP (дубликаты и orphan‑экземпляры) остались после отключения устройств?</li>
+  <li>Можно ли выборочно удалить найденные артефакты с манифестом и <code>.reg</code>‑бэкапом?</li>
+  <li>Как очистить не‑storage USB‑следы (хабы, камеры, прочие VID/PID в usbflags/DeviceMigration)?</li>
+  <li>Какие сетевые профили Wi‑Fi/VPN/NLA и связанные журналы присутствуют на машине?</li>
+  <li>Как просмотреть и очистить произвольные каналы Event Log, включая System?</li>
+  <li>Как выполнить полный forensic‑путь без GUI через <code>--clean</code>?</li>
+</ul>
+
+<h3>Чем приложение не является</h3>
+<ul>
+  <li>Это не write blocker, не средство создания forensic image и не замена EnCase, X‑Ways, Magnet AXIOM или Autopsy.</li>
+  <li>Это не UsbForensicAudit: приложение не строит граф идентичности устройств, не считает EvidenceStrength/Coverage и не предназначено для доказательной интерпретации истории подключений.</li>
+  <li>Оно не гарантирует полное исчезновение всех возможных следов USB во всех теневых копиях, offline‑образах, бэкапах стороннего ПО и корпоративных SIEM.</li>
+  <li>Оно не удаляет встроенные USB‑хабы <code>ROOT_*</code>, onboard HID/UVC/BT как «пользовательские флешки» — они намеренно защищены.</li>
+  <li>Оно не поддерживает Windows, установленную на USB‑диске, и не рассчитано на очистку при подключённых съёмных накопителях.</li>
+  <li>Автоматического undo нет: восстановление — только ручной импорт <code>.reg</code> и штатные средства Windows.</li>
+</ul>
+
+<div class="sources"><b>Основа методики очистки:</b>
+  логика USB Oblivion / USBDeview‑совместимые пути реестра ·
+  <a href="https://www.magnetforensics.com/blog/artifact-profile-usb-devices/">Magnet Forensics — USB Devices Artifact Profile</a> ·
+  <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/install/setupapi-text-logs">Microsoft — SetupAPI Text Logs</a> ·
+  <a href="https://attack.mitre.org/techniques/T1070/001/">MITRE ATT&amp;CK — Clear Windows Event Logs</a>
+</div>
+
+<h2 id="architecture">2. Архитектура простыми словами</h2>
+<p>Приложение построено как WPF‑клиент с чётким разделением UI, оркестрации очистки и доступа к Windows. Это нужно, чтобы вкладки USB / сеть / журналы не смешивали правила удаления и чтобы CLI‑режимы переиспользовали те же сервисы.</p>
+
+<table>
+  <tr><th>Слой</th><th>Роль</th><th>Что это даёт инженеру</th></tr>
+  <tr><td><b>Presentation</b><br>WPF</td><td>Четыре вкладки, sidebar‑группы, галочки выбора, подтверждения, PDF и окно журнала.</td><td>Интерфейс не «угадывает» USB‑след сам по себе: он показывает уже классифицированные <code>ArtifactItem</code> и запускает сервисы.</td></tr>
+  <tr><td><b>Application</b></td><td>CLI‑маршрутизация, headless clean, restore‑logs, ghost‑cleaner, self‑test.</td><td>Один и тот же путь очистки доступен из GUI и из <code>--clean</code>.</td></tr>
+  <tr><td><b>Domain</b></td><td>Модели артефактов, опции очистки, сетевые модели, классификаторы и pattern‑правила.</td><td>Storage vs non‑storage, self‑trace и removable path отбираются едиными эвристиками.</td></tr>
+  <tr><td><b>Infrastructure</b></td><td>Реестр (в т.ч. native delete / SYSTEM), SetupAPI uninstall, Event Log, offline hive, VSS, QuestPDF.</td><td>Ошибка одного канала не обязана останавливать весь проход; сбои пишутся в журнал операции.</td></tr>
+</table>
+
+<div class="flow">
+  <div><b>Интерфейс</b> принимает команду «Сканировать» / «Очистить» и показывает прогресс.</div>
+  <div class="arrow">↓</div>
+  <div><b>Сканер</b> собирает артефакты из реестра, файлов и журналов без удаления.</div>
+  <div class="arrow">↓</div>
+  <div><b>Классификатор</b> группирует записи (USB‑накопители, реестр, логи, призраки PnP) и выставляет Selected.</div>
+  <div class="arrow">↓</div>
+  <div><b>Очиститель</b> делает бэкап, останавливает службы, удаляет ядро USBSTOR, затем выбранные элементы, журналы, VSS и self‑trace.</div>
+  <div class="arrow">↓</div>
+  <div><b>Проверка</b> считает оставшиеся USBSTOR‑следы; при необходимости восстанавливает setupapi.dev.log и планирует reboot.</div>
+</div>
+
+<h3>Ключевые компоненты</h3>
+<table>
+  <tr><th>Компонент</th><th>Файл</th><th>Ответственность</th></tr>
+  <tr><td>ArtifactScanner</td><td><code>Services/ArtifactScanner.cs</code></td><td>Полный обход USB/storage‑артефактов</td></tr>
+  <tr><td>ArtifactCleaner</td><td><code>Services/ArtifactCleaner.cs</code></td><td>Конвейер реальной очистки</td></tr>
+  <tr><td>UsboOblivionCleanup</td><td><code>Services/UsboOblivionCleanup.cs</code></td><td>Ядро реестровой очистки в стиле USB Oblivion</td></tr>
+  <tr><td>ExtendedForensicScanner</td><td><code>Services/ExtendedForensicScanner.cs</code></td><td>Prefetch, Amcache, Shimcache, MRU, Recycle Bin</td></tr>
+  <tr><td>PnPGhostScanner</td><td><code>Services/PnPGhostScanner.cs</code></td><td>Дубликаты и orphan PnP‑экземпляры</td></tr>
+  <tr><td>OtherUsbTraceScanner/Cleaner</td><td><code>Services/OtherUsbTrace*.cs</code></td><td>Не‑storage USB‑следы</td></tr>
+  <tr><td>NetworkAuditScanner/Cleaner</td><td><code>Services/NetworkAudit/*</code></td><td>Аудит и очистка сети</td></tr>
+  <tr><td>WindowsEventLogBrowser</td><td><code>Services/WindowsEventLogBrowser.cs</code></td><td>Универсальный Event Viewer‑модуль</td></tr>
+</table>
+
+<div class="sources"><b>Архитектурные материалы:</b>
+  <a href="https://learn.microsoft.com/en-us/dotnet/desktop/wpf/">Microsoft — WPF</a> ·
+  <a href="https://learn.microsoft.com/en-us/windows/win32/api/setupapi/">Microsoft — SetupAPI</a> ·
+  <a href="https://learn.microsoft.com/en-us/windows/win32/eventlog/event-logging">Microsoft — Event Logging</a>
+</div>
+
+<h2 id="pipeline">3. Полный конвейер сканирования и очистки</h2>
+
+<h3>3.1. Конвейер сканирования (вкладка USB)</h3>
+<p>Сканирование идёт последовательно. Порядок важен: сначала инвентаризация ControlSet и статических ключей, затем пользовательские профили и файловые артефакты, в конце — ghosts PnP.</p>
+
+<table>
+  <tr><th>Шаг</th><th>Что происходит</th><th>Зачем</th></tr>
+  <tr><td>1</td><td>Обход всех <code>ControlSet00x</code>: DeviceContainers, Enum\USB, Enum\USBSTOR, DeviceClasses, STORAGE\Volume, WPDBUSENUM, static keys, DeviceMigration.</td><td>Собрать основной инвентарь PnP/USB storage.</td></tr>
+  <tr><td>2</td><td>HKLM static: Setup\Upgrade, EMDMgmt, VolumeInfoCache, MuiCache, WBEM/WDM values с USBSTOR.</td><td>Поймать остаточные ссылки вне Enum.</td></tr>
+  <tr><td>3</td><td>MountedDevices — USB/WPD values и orphan‑буквы D–Z.</td><td>Связать тома и буквы со съёмными устройствами.</td></tr>
+  <tr><td>4</td><td>Профили HKU: MountPoints2, Autoplay, Portable Devices, ShellBags, UserAssist (фильтр).</td><td>Удалить пользовательский контекст томов.</td></tr>
+  <tr><td>5</td><td>BAM/DAM — буквы D–Z на отключённых дисках + self‑trace.</td><td>Убрать execution‑следы съёмных путей и утилит очистки.</td></tr>
+  <tr><td>6</td><td>Файлы логов: setupapi*, INFCACHE.1, wmiprov.log, PCA.</td><td>Убрать текстовые следы установки устройств.</td></tr>
+  <tr><td>7</td><td>Фиксированный список PnP/storage Event Log каналов.</td><td>Подготовить очистку журналов, где пишутся USB‑события.</td></tr>
+  <tr><td>8</td><td>Recent LNK и Jump Lists с фильтрацией по содержимому.</td><td>Удалить shell‑ссылки на съёмные тома.</td></tr>
+  <tr><td>9</td><td>Extended forensic: Prefetch, Amcache, Shimcache, Explorer MRU, Recycle Bin.</td><td>Закрыть типичные forensic‑источники после USB Oblivion‑ядра.</td></tr>
+  <tr><td>10</td><td>PnPGhostScanner (если включён ScanPnPGhosts).</td><td>Найти дубликаты и orphan‑экземпляры Enum\USB/USBSTOR.</td></tr>
+</table>
+
+<p>Дедупликация ключом <code>Type|Location|ValueName</code>. По умолчанию все найденные элементы получают <code>Selected = true</code>.</p>
+
+<h3>3.2. Конвейер очистки (вкладка USB)</h3>
+<p>Предусловия: права администратора и Windows 10/11. Дальше шаги выполняются в фиксированном порядке.</p>
+
+<table>
+  <tr><th>Шаг</th><th>Что происходит</th><th>Зачем / риск</th></tr>
+  <tr><td>1</td><td>Опциональная точка восстановления (<code>Checkpoint-Computer</code>). В GUI по умолчанию <b>выкл.</b></td><td>Restore point сам оставляет forensic‑артефакт.</td></tr>
+  <tr><td>2</td><td>Резервная копия <code>.reg</code> + manifest <code>.txt</code> рядом с EXE (по умолчанию вкл.).</td><td>Даёт ручной откат реестровой части.</td></tr>
+  <tr><td>3</td><td>Завершение Explorer (если не запланирован reboot).</td><td>Снизить блокировки ShellBags/Recent.</td></tr>
+  <tr><td>4</td><td>Остановка служб: vds, SysMain, EMDMgmt, WMPNetworkSvc.</td><td>Освободить ReadyBoost/тома.</td></tr>
+  <tr><td>5</td><td>Core USB cleanup: offline USB disks → uninstall USBSTOR → UsboOblivionCleanup по ControlSet → MountedDevices.</td><td>Удалить «живой» PnP‑инвентарь накопителей.</td></tr>
+  <tr><td>6</td><td>Выбранные артефакты: values → keys (deepest first) → files.</td><td>Дочистить то, что ядро не покрыло.</td></tr>
+  <tr><td>7</td><td>Event logs: <code>wevtutil cl</code> + ExtraChannels (UserPnp / Kernel‑PnP / System purge).</td><td>Убрать события подключения/установки.</td></tr>
+  <tr><td>8</td><td>Offline hive retry для USBSTOR.</td><td>Дожать ключи, занятые живой системой.</td></tr>
+  <tr><td>9</td><td>VSS: <code>vssadmin delete shadows /all /quiet</code> (если включено).</td><td><b>Уничтожает все теневые копии.</b></td></tr>
+  <tr><td>10</td><td>SelfTraceCleaner — следы USBTraceCleaner, USBOblivion, USBDeview, USBDetector, UsbForensicAudit.</td><td>Убрать доказательства запуска очистителей.</td></tr>
+  <tr><td>11</td><td>Verify: <code>CountUsbStorageTraceDevices()</code>.</td><td>Критерий успеха: 0 оставшихся USBSTOR‑следов (или simulation).</td></tr>
+  <tr><td>12</td><td>PnP ghosts из выбора / RemoveAll.</td><td>Удалить дубликаты и orphan‑экземпляры.</td></tr>
+  <tr><td>13</td><td>Restore setupapi.dev.log, если файл уничтожен scrub‑ом.</td><td>Не оставлять систему без критичного лога установки.</td></tr>
+  <tr><td>14</td><td>Purge System.evtx при CleanSystemEventLog — убрать Event ID 104 от очистки журналов.</td><td>Деструктивно для всего System log.</td></tr>
+  <tr><td>15</td><td>Reboot (<code>shutdown /r /t 5</code>) или перезапуск Explorer.</td><td>Зафиксировать состояние после удаления PnP.</td></tr>
+</table>
+
+<div class="note"><b>Режим симуляции.</b> Галочка «Симуляция (без удаления)» на вкладке USB включает <code>CleanupOptions.SimulationMode</code>: выполняются те же шаги с логом <code>[SIM]</code>, но реестр, файлы и журналы не изменяются. На вкладке «Аудит сети» симуляция включается отдельной галочкой.</div>
+
+<h2 id="functions" class="page-break">4. Функциональные блоки: что, зачем и как выполняется</h2>
+
+<div class="feature">
+<h3>4.1. Права администратора и совместимость ОС</h3>
+<p><b>Что проверяется.</b> Манифест <code>requireAdministrator</code>; runtime‑проверка <code>AdminHelper.IsAdministrator()</code> и <code>IsWindows10Or11()</code> (build ≥ 10240; для Windows 11 — ≥ 22000).</p>
+<p><b>Зачем.</b> Без повышения прав недоступны Security/часть Event Log, удаление защищённых ключей Enum, offline hive, purge System.evtx и остановка служб.</p>
+<p><b>Что означает результат.</b> Статус администратора — необходимое, но не достаточное условие: политики, EDR и занятые устройства всё равно могут дать Access Denied.</p>
+<div class="sources"><b>Источники:</b>
+  <a href="https://learn.microsoft.com/en-us/windows/security/application-security/application-control/user-account-control/how-it-works">Microsoft — UAC</a>
+</div>
+</div>
+
+<div class="feature">
+<h3>4.2. Ядро реестра: USBSTOR, USB, DeviceClasses, usbflags</h3>
+<p><b>Что сканируется/удаляется.</b> Во всех ControlSet:</p>
+<ul>
+  <li><code>Enum\USBSTOR</code>, <code>Enum\USBPRINT</code>, <code>Services\USBSTOR\Enum</code> — полное удаление;</li>
+  <li><code>Enum\SWD\WPDBUSENUM</code>, <code>Enum\STORAGE\Volume</code>, <code>RemovableMedia</code> — фильтр по USBSTOR/съёмным;</li>
+  <li><code>Enum\USB\VID_*&amp;PID_*</code> — экземпляры с Service USBSTOR / UASPStor / MTP / HID по опциям;</li>
+  <li><code>Control\DeviceContainers</code> — только если BaseContainers содержит USBSTOR;</li>
+  <li><code>Control\DeviceClasses</code> и известные GUID томов/WPD — USBSTOR‑filtered;</li>
+  <li><code>Control\usbflags</code>, <code>IgnoreHWSerNum*</code>, <code>Control\usbstor</code>;</li>
+  <li><code>Control\DeviceMigration</code> — storage/MTP записи, не весь корень;</li>
+  <li>ReadyBoost (<code>Services\rdyboost</code>).</li>
+</ul>
+<p><b>Зачем.</b> Это основной инвентарь, по которому Windows «помнит» флешки и MTP‑тома.</p>
+<p><b>Защита.</b> <code>ROOT_*</code> хабы не удаляются — полное удаление вызывает повторное перечисление PnP и риск нестабильности шины. DeviceContainers не чистятся по голому <code>USB#</code>, чтобы не задеть камеру/клавиатуру.</p>
+<div class="sources"><b>Источники:</b>
+  <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/install/device-identification-strings">Microsoft — Device identification strings</a> ·
+  <a href="https://www.nirsoft.net/utils/usb_devices_view.html">NirSoft USBDeview</a>
+</div>
+</div>
+
+<div class="feature">
+<h3>4.3. MountedDevices, WPD и пользовательские профили</h3>
+<p><b>Что затрагивается.</b></p>
+<ul>
+  <li><code>HKLM\SYSTEM\MountedDevices</code> — USB/WPD mappings и orphan‑буквы;</li>
+  <li><code>SOFTWARE\Microsoft\Windows Portable Devices\Devices\{child}</code> — только дочерние USB/WPD, родительский ключ сохраняется;</li>
+  <li>HKU: MountPoints2, CPC\Volume, Autoplay KnownDevices, Portable Devices, ShellBags, MuiCache, SyncMgr;</li>
+  <li>UserAssist — только значения с USB/self‑маркерами после ROT13;</li>
+  <li>Explorer MRU: RecentDocs, TypedPaths, OpenSavePidlMRU, LastVisitedPidlMRU.</li>
+</ul>
+<p><b>Как понимать.</b> Удаление MountPoints2/LNK убирает пользовательский след тома, но не доказывает и не опровергает копирование файлов. Одна буква диска никогда не была уникальным идентификатором устройства.</p>
+<div class="sources"><b>Источники:</b>
+  <a href="https://www.magnetforensics.com/blog/artifact-profile-usb-devices/">Magnet Forensics — MountedDevices / USBSTOR</a>
+</div>
+</div>
+
+<div class="feature">
+<h3>4.4. SetupAPI, INFCACHE, PCA и scrub логов</h3>
+<p><b>Что делается.</b> Файлы <code>%WinDir%\setup*.log</code>, <code>%WinDir%\inf\setupapi*.log</code>, <code>setupapi.ev1/2/3</code>, <code>INFCACHE.1</code>, <code>wmiprov.log</code>, PCA <code>PcaGeneralDb*.txt</code> сканируются и scrub/delete по правилам.</p>
+<p><b>Важная оговорка.</b> <code>setupapi.dev.log</code> намеренно не уничтожается «в ноль» навсегда: после scrub приложение восстанавливает критичный файл через <code>LogFileScrubber.EnsureCriticalSetupApiLogs</code>, чтобы Windows Setup/PnP не остались без журнала. CLI <code>--restore-logs</code> пересоздаёт пустой setupapi.dev.log.</p>
+<div class="sources"><b>Источники:</b>
+  <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/install/setupapi-text-logs">Microsoft — SetupAPI Text Logs</a>
+</div>
+</div>
+
+<div class="feature">
+<h3>4.5. Prefetch, Amcache, Shimcache, Jump Lists, Recycle Bin</h3>
+<p><b>Что сканируется.</b> Через <code>ExtendedForensicScanner</code> и <code>ForensicTracePatterns</code>:</p>
+<ul>
+  <li>Prefetch <code>*.pf</code> с USB/self‑токенами;</li>
+  <li>Amcache.hve — selective scrub через копию и offline load (<code>AmcacheCleaner</code>);</li>
+  <li>AppCompatCache / Shimcache — value переписывается, если содержит USB/self;</li>
+  <li>Recent <code>*.lnk</code>, AutomaticDestinations / CustomDestinations — только при совпадении содержимого;</li>
+  <li><code>$Recycle.Bin\$I*</code>/<code>$R*</code> с USB‑путями.</li>
+</ul>
+<p><b>Ограничение.</b> Amcache может быть залочен; без успешного offline‑load scrub пропускается. Jump List без USB/self‑маркера не трогается.</p>
+<div class="sources"><b>Источники:</b>
+  <a href="https://ericzimmerman.github.io/">Eric Zimmerman Tools</a> ·
+  <a href="https://docs.velociraptor.app/artifact_references/pages/windows.forensics.bam/">Velociraptor — BAM</a>
+</div>
+</div>
+
+<div class="feature">
+<h3>4.6. BAM/DAM и self‑trace</h3>
+<p><b>Что удаляется.</b> В <code>Services\bam|dam\State\UserSettings\&lt;SID&gt;</code> — values вида <code>X:\...</code> для букв D–Z на отключённых дисках и пути известных cleaner‑утилит.</p>
+<p><b>SelfTraceCleaner</b> дополнительно чистит Prefetch/BAM/Recent/Jump Lists/Temp для:</p>
+<ul>
+  <li>USBTraceCleaner;</li>
+  <li>USB Oblivion;</li>
+  <li>USBDeview;</li>
+  <li>USBDetector;</li>
+  <li>UsbForensicAudit.</li>
+</ul>
+<p><b>Как понимать.</b> Это снижает видимость факта очистки на самой машине. Это не скрывает запись в централизованном SIEM/EDR и не отменяет необходимость внешней chain of custody.</p>
+</div>
+
+<div class="feature">
+<h3>4.7. Журналы событий (вкладка USB)</h3>
+<p><b>Фиксированный список каналов для USB‑вкладки:</b></p>
+<ul>
+  <li>Microsoft-Windows-DeviceSetupManager/Operational, Admin</li>
+  <li>Microsoft-Windows-Kernel-PnP/Configuration</li>
+  <li>Microsoft-Windows-Kernel-ShimEngine/Operational</li>
+  <li>Microsoft-Windows-DriverFrameworks-UserMode/Operational</li>
+  <li>Microsoft-Windows-Partition/Diagnostic</li>
+  <li>Microsoft-Windows-Storage-ClassPnP/Operational</li>
+  <li>Microsoft-Windows-WPD-MTPClassDriver/Operational</li>
+  <li>Microsoft-Windows-UserPnp/DeviceInstall, Operational</li>
+  <li>HardwareEvents</li>
+</ul>
+<p><b>Дополнительно при clean:</b> UserPnp/Operational, Kernel‑PnP Device Management / Device Configuration; при опции — полный purge <code>System.evtx</code> (чтобы убрать Event ID 104 от очистки журналов).</p>
+<p><b>Механизм:</b> <code>wevtutil cl</code> с таймаутом ~12 с; для System — остановка службы EventLog, удаление файла или <code>MoveFileEx</code> до reboot.</p>
+<div class="critical"><b>Риск.</b> Очистка System удаляет и несвязанные с USB события. Повторный <code>wevtutil cl</code> снова может породить Event ID 104 — именно поэтому есть отдельный purge файла журнала.</div>
+</div>
+
+<div class="feature">
+<h3>4.8. PnP ghosts: дубликаты и orphan‑экземпляры</h3>
+<p><b>Что ищется.</b> <code>PnPGhostScanner</code>:</p>
+<ul>
+  <li><b>Duplicates</b> — одинаковый <code>ControlSet|VidKey|DuplicateGroupKey</code>; keeper = live device или наибольший enum index;</li>
+  <li><b>Orphans</b> — removable USB service + устройство отсутствует по SetupAPI/presence check;</li>
+  <li>отдельные orphan в <code>Enum\USBSTOR</code>.</li>
+</ul>
+<p><b>CLI:</b> <code>--fix-duplicates</code> запускает ghost‑cleaner без полного forensic‑пути.</p>
+<p><b>Как понимать.</b> «Призрак» — остаточная PnP‑запись, а не доказательство повторного подключения в конкретную секунду.</p>
+</div>
+
+<div class="feature">
+<h3>4.9. Вкладка «Другие USB-следы»</h3>
+<p><b>Назначение.</b> Артефакты <b>вне</b> storage‑сканера — по аналогии с блоком «Другие следы» в USBDetector: не‑накопители в usbflags / DeviceMigration / Setup\Upgrade.</p>
+<p><b>Источники:</b> <code>Control\usbflags</code> (compact VIDPID + IgnoreHWSerNum), <code>Control\DeviceMigration</code>, <code>SYSTEM\Setup\Upgrade\...\DeviceMigration</code>.</p>
+<p><b>Исключение:</b> всё, что матчит <code>StorageTracePatterns</code> (USBSTOR/UASPStor и т.п.), во вкладку не попадает — это зона основной USB‑вкладки.</p>
+<p><b>Очистка:</b> сбор путей по VID/PID → uninstall Enum\USB instances → delete registry (ownership + native + SYSTEM retry) → scrub строк setupapi с этим VID/PID.</p>
+<div class="warning"><b>Побочный эффект.</b> USB‑мышь/клавиатура могут кратковременно отключиться. «Найдено: 0» после частичной очистки не гарантирует полный wipe всех упоминаний VID/PID.</div>
+</div>
+
+<div class="feature">
+<h3>4.10. Вкладка «Журналы событий»</h3>
+<p><b>Независимый модуль</b> — не меняет логику <code>ArtifactCleaner</code>.</p>
+<ul>
+  <li>Список: динамически все каналы <code>EventLogSession.GetLogNames()</code>;</li>
+  <li>группы: «Журналы Windows», Microsoft, vendor‑prefix, «Прочие»;</li>
+  <li>чтение до 400 записей, опциональный USB‑фильтр;</li>
+  <li>очистка: <code>wevtutil cl</code>; Security — только с галочкой; System purge — отдельная опция.</li>
+</ul>
+<p>Классические каналы Windows: Application, Security, Setup, System, ForwardedEvents.</p>
+</div>
+
+<div class="feature">
+<h3>4.11. Device uninstall, offline disks и ACL bypass</h3>
+<p><b>Что выполняется перед удалением ключей.</b></p>
+<ul>
+  <li><code>VolumeHelper.OfflineUsbDisks()</code> — PowerShell <code>Set-Disk -IsOffline</code>;</li>
+  <li><code>DeviceUninstallHelper</code> — SetupAPI <code>CM_Uninstall_DevNode</code> / <code>pnputil /remove-device</code>;</li>
+  <li>при Access Denied — <code>RegistrySecurityHelper.TakeOwnershipTree</code> и удаление от SYSTEM через <code>RegistrySystemHelper</code> (до 3 попыток);</li>
+  <li>offline SYSTEM hive copy в <code>%TEMP%\USBTC_SYSTEM_{guid}</code> для retry USBSTOR.</li>
+</ul>
+<p><b>Зачем.</b> Живые PnP‑узлы и TrustedInstaller‑ACL часто блокируют обычный <code>RegDeleteKey</code>.</p>
+</div>
+
+<div class="feature">
+<h3>4.12. Volume Shadow Copies</h3>
+<p><b>Что делается.</b> При включённой опции — <code>vssadmin delete shadows /all /quiet</code>.</p>
+<p><b>Зачем.</b> Иначе старые USB‑записи могут остаться в shadow copy SYSTEM/SOFTWARE hive или SetupAPI.</p>
+<div class="critical"><b>Последствие.</b> Теряются <b>все</b> теневые копии тома, включая точки восстановления, не связанные с USB. Включайте опцию только осознанно.</div>
+</div>
+
+<div class="feature">
+<h3>4.13. База VID/PID и отображение в UI</h3>
+<p><b>Что используется.</b> Embedded ресурс <code>Assets/USBVendors.txt</code> (~3400 VID, десятки тысяч продуктов) через <code>UsbVendorDatabase</code>.</p>
+<p><b>Что показывается.</b> Колонки VID, PID, производитель, модель, первое подключение (PnP property <code>{83da6326-...}\0064</code> / FirstInstallDate), источник.</p>
+<p><b>Как понимать.</b> VID/PID описывает модель/семейство, а не уникальный физический экземпляр. Для экземпляра нужен serial / instance ID.</p>
+<div class="sources"><b>Источники:</b>
+  <a href="https://usb-ids.gowdy.us/">The USB ID Repository</a> ·
+  <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/install/devpkey-device-firstinstalldate">DEVPKEY_Device_FirstInstallDate</a>
+</div>
+</div>
+
+<h2 id="selection" class="page-break">5. Как выполняется отбор и классификация</h2>
+
+<h3>5.1. Признак «USB‑накопитель»</h3>
+<p><code>ArtifactClassifier.IsUsbStorageTrace</code> считает запись storage‑следом, если:</p>
+<ul>
+  <li>путь содержит <code>\Enum\USBSTOR</code>, <code>\Services\USBSTOR\</code>, <code>\Control\usbflags\</code>, <code>\Control\usbstor\</code>, <code>\Control\DeviceMigration</code>, <code>\Enum\USBPRINT</code>;</li>
+  <li>текст содержит <code>USBSTOR</code> / <code>UASPStor</code>;</li>
+  <li>тип <code>RegistryMounted</code>;</li>
+  <li><code>\Enum\USB\</code> (не <code>ROOT_</code>) и Service = USBSTOR/UASPStor.</li>
+</ul>
+<p>Родительский ключ WPD Devices в storage‑группу не попадает.</p>
+
+<h3>5.2. Forensic content matching</h3>
+<p><code>ForensicTracePatterns</code> ищет токены: USBSTOR, WPDBUSENUM, UASPStor, RemovableMedia, WpdMtp, имена cleaner‑exe, съёмные буквы D–Z (если диск сейчас не подключён).</p>
+
+<h3>5.3. Модель выбора</h3>
+<ul>
+  <li>Каждая строка имеет checkbox <code>Selected</code> (по умолчанию true).</li>
+  <li>Sidebar фильтрует по <code>ArtifactViewGroup</code>.</li>
+  <li>Clean обрабатывает только выбранные элементы + всегда выполняет core USB registry path.</li>
+  <li><code>IsHandledByCoreUsbCleanup()</code> пропускает дубли, уже закрытые ядром.</li>
+</ul>
+
+<h3>5.4. Разделение USB vs «Другие USB-следы»</h3>
+<table>
+  <tr><th>Вкладка</th><th>Включает</th><th>Исключает</th></tr>
+  <tr><td>USB</td><td>USBSTOR/UASP/WPD‑тома, MountedDevices, forensic files, PnP ghosts storage</td><td>Не‑storage usbflags как отдельный продуктовый список</td></tr>
+  <tr><td>Другие USB-следы</td><td>usbflags / DeviceMigration / Setup\Upgrade без storage‑маркеров</td><td>Всё, что матчит StorageTracePatterns</td></tr>
+</table>
+
+<div class="note"><b>Практический смысл.</b> Сначала чистите вкладку USB (накопители), затем при необходимости «Другие USB-следы». Смешение групп в одном проходе не требуется: это разные цели и разный риск для HID/камер.</div>
+
+<h2 id="safety">6. Модель безопасности, бэкап и проверка результата</h2>
+
+<table>
+  <tr><th>Механизм</th><th>Реализация</th><th>Граница гарантии</th></tr>
+  <tr><td>Elevation</td><td>manifest + runtime check</td><td>Не отменяет EDR/policy deny</td></tr>
+  <tr><td>Backup .reg</td><td><code>USBTraceCleaner_backup_YYYY-MM-DD_HH-mm-ss.reg</code> рядом с EXE</td><td>Реестровая часть; файлы/журналы/VSS не откатывает</td></tr>
+  <tr><td>Manifest</td><td><code>USBTraceCleaner_manifest_*.txt</code> — список удалённого</td><td>Журнал операции, не подпись</td></tr>
+  <tr><td>Restore point</td><td>опционально, GUI default off</td><td>Сама создаёт артефакт</td></tr>
+  <tr><td>Confirmation</td><td>MessageBox перед destructive clean</td><td>Не заменяет процедуру согласования в организации</td></tr>
+  <tr><td>Undo</td><td>только ручной <code>reg import</code></td><td>Нет автоматического rollback файлов/EVTX/VSS</td></tr>
+  <tr><td>Success criterion</td><td><code>usbStorRemaining == 0</code> (или simulation)</td><td>Не значит «система чиста от любого USB‑упоминания»</td></tr>
+  <tr><td>Logging</td><td>in‑memory журнал UI + опциональный LogPath</td><td>Не append‑only hash chain</td></tr>
+</table>
+
+<h3>6.1. Как читать результат очистки</h3>
+<ul>
+  <li><b>Success + 0 USBSTOR</b> — ядро storage‑следов в доступных ControlSet снято по критерию счётчика.</li>
+  <li><b>Частичные ошибки Access Denied</b> — устройство занято, ACL или политика; смотрите журнал и повторите после reboot / offline hive.</li>
+  <li><b>«Найдено: 0» на «Других USB»</b> — не гарантия полного wipe конкретного VID/PID во всех логах.</li>
+  <li><b>Event ID 104</b> после очистки журналов — ожидаемый артефакт очистки; снимается purge System.evtx, но может вернуться при новых clear.</li>
+</ul>
+
+<div class="warning"><b>Перед юридически значимым исследованием</b> сначала снимите forensic‑образ штатным процессом организации. Запуск USBTraceCleaner на живой системе сам создаёт и удаляет артефакты и меняет состояние доказательственной базы.</div>
+
+<h2 id="network" class="page-break">7. Аудит сети</h2>
+<p>Отдельная вкладка <b>«Аудит сети»</b> не является частью USB‑конвейера. Она инвентаризирует и при необходимости удаляет сетевые следы Windows.</p>
+
+<h3>7.1. Что сканируется</h3>
+<table>
+  <tr><th>Фаза</th><th>Источник</th><th>Можно очищать?</th></tr>
+  <tr><td>Wi‑Fi profiles</td><td><code>netsh wlan show profiles</code>, XML в ProgramData\Wlansvc</td><td>Да</td></tr>
+  <tr><td>Ethernet</td><td><code>NetworkInterface.GetAllNetworkInterfaces()</code></td><td>Аудит only</td></tr>
+  <tr><td>DNS cache</td><td><code>ipconfig /displaydns</code></td><td>Да (flush)</td></tr>
+  <tr><td>NetworkList / NLA / WlanSvc / VPN</td><td>реестр HKLM/HKCU, rasphone.pbk</td><td>Да</td></tr>
+  <tr><td>hosts</td><td><code>%SystemRoot%\System32\drivers\etc\hosts</code></td><td>Да (сброс к default, отдельное подтверждение)</td></tr>
+  <tr><td>SRUDB.dat</td><td><code>System32\sru\SRUDB.dat</code> (служба DPS)</td><td>Да (может потребовать reboot)</td></tr>
+  <tr><td>Сетевые Event Log</td><td>WLAN, DHCP, DNS, VPN, NLA, NDIS, Firewall и др.</td><td>Да (каналы из скана)</td></tr>
+  <tr><td>USB/BT Net devices</td><td>Enum\USB Class=Net/Modem</td><td><b>Нет</b> (CanClean=false)</td></tr>
+  <tr><td>Router audit</td><td>ping/ARP/SNMP/HTTP к gateway</td><td><b>Нет</b> — данные на роутере</td></tr>
+</table>
+
+<h3>7.2. Full clean сети</h3>
+<p><code>NetworkPostCleanActions</code> может: остановить DPS/DiagTrack, отключить VPN, удалить все Wi‑Fi профили и XML, очистить деревья NetworkList, <code>arp -d *</code>, <code>ipconfig /flushdns</code>, отключить Wi‑Fi session, запланировать reboot через 60 с и выполнить <code>NetworkAuditVerifier</code>.</p>
+
+<div class="note"><b>Белый список</b> IP / SSID / VPN маркирует элементы как «Разрешено» и <b>исключает их из очистки</b> (выборочной и максимальной), включая удаление Wi‑Fi профилей в глубоком пути. Сброс hosts ломает локальный DNS Docker/Kubernetes, если там были кастомные записи.</div>
+
+<h3>7.3. Отчёты сети</h3>
+<p>PDF через QuestPDF: <code>ReportExportService.BuildNetworkReport</code> + summary‑окно с хронологией подключений.</p>
+
+<div class="sources"><b>Источники:</b>
+  <a href="https://learn.microsoft.com/en-us/windows-server/networking/technologies/network-location-awareness">Microsoft — Network Location Awareness</a> ·
+  <a href="https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/netsh-wlan">Microsoft — netsh wlan</a>
+</div>
+
+<h2 id="operation">8. Практический порядок работы инженера</h2>
+
+<h3>8.1. Перед запуском</h3>
+<ol>
+  <li>Зафиксировать цель: удаление следов конкретных накопителей, подготовка стенда, сетевой аудит или очистка журналов.</li>
+  <li>Отключить все USB‑накопители. Не запускать на Windows‑on‑USB.</li>
+  <li>Записать локальное время, часовой пояс и состояние ПК.</li>
+  <li>Если нужен forensic‑аудит истории — сначала UsbForensicAudit / образ диска, и только потом cleaner.</li>
+  <li>Запустить EXE от имени администратора.</li>
+</ol>
+
+<h3>8.2. Типовой сценарий очистки USB</h3>
+<ol>
+  <li>Вкладка USB → «Сканировать».</li>
+  <li>Просмотреть группы sidebar; снять галочки с того, что нельзя трогать.</li>
+  <li>Проверить опции: backup on; restore point обычно off; VSS и System log — только при полном forensic‑пути.</li>
+  <li>«Очистить» → подтвердить → дождаться verify.</li>
+  <li>Сохранить PDF‑отчёт при необходимости.</li>
+  <li>Перезагрузить Windows (обязательно после реальной очистки).</li>
+  <li>После reboot при необходимости повторить скан; для setupapi — <code>--restore-logs</code>.</li>
+</ol>
+
+<h3>8.3. Сценарий «Другие USB-следы»</h3>
+<ol>
+  <li>Сначала завершить storage‑очистку.</li>
+  <li>Сканировать вкладку «Другие USB-следы».</li>
+  <li>Выбрать VID/PID группы; учесть риск для мыши/клавиатуры.</li>
+  <li>Очистить и перезагрузить.</li>
+</ol>
+
+<h3>8.4. Сценарий сети</h3>
+<ol>
+  <li>Сканировать → изучить Wi‑Fi/VPN/NLA/hosts/SRU.</li>
+  <li>Экспортировать PDF summary до очистки, если нужен отчёт «как было».</li>
+  <li>Выборочная очистка или full clean с пониманием disconnect Wi‑Fi и reboot 60 с.</li>
+  <li>Проверить verifier / повторный скан.</li>
+</ol>
+
+<h3>8.5. Что писать в инженерном заключении</h3>
+<p><b>Корректно:</b> «После выполнения USBTraceCleaner v1.7.1 на хосте X счётчик USBSTOR‑следов стал 0. Созданы backup/manifest рядом с EXE. Выполнена перезагрузка. Повторный скан не показал Enum\USBSTOR записей съёмных накопителей».</p>
+<p><b>Некорректно:</b> «Устройство никогда не подключалось» или «все возможные следы USB уничтожены во всех системах резервного копирования».</p>
+
+<h2 id="storage">9. Хранение, отчёты и CLI</h2>
+
+<h3>9.1. Пути</h3>
+<table>
+  <tr><th>Артефакт</th><th>Путь</th></tr>
+  <tr><td>EXE / backup / manifest</td><td>каталог EXE (<code>AppPaths.GetExeDirectory()</code>)</td></tr>
+  <tr><td>Reg backup</td><td><code>USBTraceCleaner_backup_{timestamp}.reg</code></td></tr>
+  <tr><td>Manifest</td><td><code>USBTraceCleaner_manifest_{timestamp}.txt</code></td></tr>
+  <tr><td>PDF</td><td>выбор пользователя: <code>USBTraceCleaner_{USB|Network}_{Scan|Clean|GhostClean}_{date}.pdf</code></td></tr>
+  <tr><td>Temp</td><td><code>%TEMP%\USBTC_*</code>, offline hive/Amcache copies</td></tr>
+  <tr><td>UI log</td><td>только в памяти (окно «Журнал»), пока не сохранён пользователем</td></tr>
+  <tr><td>Инженерное руководство</td><td><code>docs\USBTraceCleaner_Инженерное_руководство.pdf</code>; при <code>build-exe.ps1</code> / publish копируется рядом с EXE</td></tr>
+</table>
+
+<h3>9.2. CLI</h3>
+<table>
+  <tr><th>Команда</th><th>Действие</th></tr>
+  <tr><td><code>USBTraceCleaner.exe --clean</code></td><td>Headless полный forensic clean; без auto‑reboot и без CloseExplorer</td></tr>
+  <tr><td><code>--restore-logs</code></td><td>Восстановить/создать setupapi.dev.log</td></tr>
+  <tr><td><code>--fix-duplicates</code></td><td>Удаление PnP ghosts/duplicates</td></tr>
+  <tr><td><code>--self-test</code></td><td>Встроенная диагностика паттернов/реестра</td></tr>
+</table>
+
+<h3>9.3. Сборка portable EXE</h3>
+<pre style="background:#edf2f6;padding:3mm;font-family:Consolas,monospace;font-size:8.8pt;overflow-wrap:anywhere;">
+dotnet publish USBTraceCleaner\USBTraceCleaner.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+→ USBTraceCleaner\bin\Release\net8.0-windows\win-x64\publish\USBTraceCleaner.exe
+</pre>
+<p class="small">Платформа: .NET 8, WPF, win-x64, self-contained single-file. Рядом с EXE на целевом ПК должно лежать это инженерное руководство (как у UsbForensicAudit).</p>
+
+<h2 id="limits" class="page-break">10. Ограничения и запрещённые выводы</h2>
+
+<table>
+  <tr><th>Наблюдение</th><th>Что допустимо утверждать</th><th>Что нельзя утверждать</th></tr>
+  <tr><td>Скан нашёл USBSTOR</td><td>Windows хранит/хранила запись накопителя.</td><td>Пользователь копировал файлы; устройство подключено сейчас.</td></tr>
+  <tr><td>Clean Success, 0 USBSTOR</td><td>Доступные storage‑следы по критерию приложения удалены.</td><td>Любой USB‑след отсутствует во всех бэкапах/SIEM/VSS других томов.</td></tr>
+  <tr><td>Удалён LNK/Jump List</td><td>Shell‑ссылка на объект/том удалена.</td><td>Файл не существовал / не копировался.</td></tr>
+  <tr><td>Очищен Event Log</td><td>Канал очищен через wevtutil/purge.</td><td>Событие никогда не происходило; централизованная копия отсутствует.</td></tr>
+  <tr><td>Self‑trace удалён</td><td>Локальные артефакты запуска cleaner снижены.</td><td>Факт очистки невозможно установить никаким методом.</td></tr>
+  <tr><td>VID/PID совпал</td><td>Совпадает модель/семейство.</td><td>Это один физический экземпляр.</td></tr>
+  <tr><td>Встроенный USB остался</td><td>Хабы/onboard устройства защищены политикой приложения.</td><td>Очистка «не сработала».</td></tr>
+  <tr><td>Router audit нашёл SSID/ARP</td><td>Сетевой контур виден с хоста.</td><td>Эти данные удалены с роутера приложением.</td></tr>
+</table>
+
+<h3>Факторы, снижающие полноту очистки</h3>
+<ul>
+  <li>USB‑накопитель оставался подключённым во время clean;</li>
+  <li>ключ/файл залочен службой или EDR;</li>
+  <li>Amcache/SRUDB требуют reboot‑retry;</li>
+  <li>теневые копии не удалялись (опция VSS выкл.);</li>
+  <li>профиль пользователя недоступен / зашифрован;</li>
+  <li>корпоративный агент пишет свои журналы вне Windows Event Log;</li>
+  <li>повторная установка драйвера/подключение устройства создаёт новые следы.</li>
+</ul>
+
+<h2 id="sources-list">11. Каталог проверенных материалов</h2>
+<p>Ниже — материалы, использованные как техническая основа интерпретации и очистки. Дата сверки с кодом: 18.07.2026.</p>
+
+<h3>Microsoft Learn и платформенные API</h3>
+<ol>
+  <li><a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/install/device-identification-strings">Device identification strings</a></li>
+  <li><a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/install/devpkey-device-firstinstalldate">DEVPKEY_Device_FirstInstallDate</a></li>
+  <li><a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/install/setupapi-text-logs">SetupAPI Text Logs</a></li>
+  <li><a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/install/setupapi">SetupAPI</a></li>
+  <li><a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/pnputil">pnputil</a></li>
+  <li><a href="https://learn.microsoft.com/en-us/windows/win32/eventlog/event-logging">Windows Event Logging</a></li>
+  <li><a href="https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/wevtutil">wevtutil</a></li>
+  <li><a href="https://learn.microsoft.com/en-us/windows/win32/vss/volume-shadow-copy-service-portal">Volume Shadow Copy Service</a></li>
+  <li><a href="https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/vssadmin-delete-shadows">vssadmin delete shadows</a></li>
+  <li><a href="https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/netsh-wlan">netsh wlan</a></li>
+  <li><a href="https://learn.microsoft.com/en-us/windows/security/application-security/application-control/user-account-control/how-it-works">UAC</a></li>
+  <li><a href="https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-1102">Security Event 1102</a></li>
+  <li><a href="https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-104">System Event 104</a></li>
+</ol>
+
+<h3>DFIR и эталонные инструменты</h3>
+<ol>
+  <li><a href="https://www.magnetforensics.com/blog/artifact-profile-usb-devices/">Magnet Forensics — USB Devices Artifact Profile</a></li>
+  <li><a href="https://artefacts.help/windows_etw_usb_activity.html">artefacts.help — Windows ETW USB activity</a></li>
+  <li><a href="https://vortexforensic.com/repository/USB/usb_registry.html">Vortex — USB Registry Tracks</a></li>
+  <li><a href="https://ericzimmerman.github.io/">Eric Zimmerman Tools</a></li>
+  <li><a href="https://docs.velociraptor.app/artifact_references/pages/windows.forensics.bam/">Velociraptor — BAM</a></li>
+  <li><a href="https://attack.mitre.org/techniques/T1070/001/">MITRE ATT&amp;CK — Clear Windows Event Logs</a></li>
+  <li><a href="https://www.nirsoft.net/utils/usb_devices_view.html">NirSoft USBDeview</a></li>
+  <li><a href="https://usb-ids.gowdy.us/">The USB ID Repository</a></li>
+</ol>
+
+<h3>Связанные приложения линейки</h3>
+<ol>
+  <li>UsbForensicAudit — аудит и сопоставление артефактов (не очистка)</li>
+  <li>USB Oblivion — исторический эталон реестровой очистки USBSTOR</li>
+  <li>USBDeview / USBDetector — инвентаризация и «другие следы»</li>
+</ol>
+
+<h2>Итог для инженера</h2>
+<p>USBTraceCleaner следует рассматривать как <b>управляемое средство удаления USB/forensic‑артефактов на живой Windows</b>. Его сильная сторона — не «магическая кнопка стереть всё», а явный конвейер: скан → классификация → бэкап/manifest → core USBSTOR cleanup → выбранные артефакты → журналы/VSS/self‑trace → verify → reboot.</p>
+<p>Надёжная эксплуатация получается, когда инженер заранее отключает накопители, понимает деструктивность VSS/System log, сохраняет backup/manifest, перезагружает систему и не подменяет результат очистки утверждениями о полной исторической невозможности подключения устройства.</p>
+
+<div class="footer-note">
+  USBTraceCleaner v1.7.1 · Инженерное руководство · 18 июля 2026 · Сверено с исходным кодом репозитория IdeaProjects\USBTraceCleaner
+</div>
+</body>
+</html>

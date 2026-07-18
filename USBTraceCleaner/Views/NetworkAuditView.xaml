@@ -58,6 +58,9 @@
                         <DatePicker x:Name="DpTo" Width="128" Margin="0,0,14,8"/>
                         <CheckBox x:Name="ChkShowSecrets" Style="{StaticResource CompactCheckBox}"
                                   Content="Показать пароли Wi‑Fi" IsChecked="True" Margin="0,0,14,8"/>
+                        <CheckBox x:Name="ChkSimulation" Style="{StaticResource CompactCheckBox}"
+                                  Content="Симуляция (без удаления)" IsChecked="False" Margin="0,0,14,8"
+                                  ToolTip="Прогон очистки сети без удаления профилей и журналов"/>
                         <CheckBox x:Name="ChkFullClean" Style="{StaticResource CompactCheckBox}"
                                   Content="Максимальная очистка" IsChecked="True" Margin="0,0,14,8"/>
                         <CheckBox x:Name="ChkDisconnect" Style="{StaticResource CompactCheckBox}"

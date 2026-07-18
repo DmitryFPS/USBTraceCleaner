@@ -65,11 +65,18 @@ public sealed class NetworkAuditCleaner
         if (options.FullCleanMode)
         {
             NetworkPostCleanActions.StopBlockingServices(L);
-            NetworkPostCleanActions.RunFullCleanExtras(L);
+            NetworkPostCleanActions.RunFullCleanExtras(options.Whitelist, L);
         }
 
         foreach (var item in selected)
         {
+            if (item.AuthorizationStatus == NetworkAuthorizationStatus.Allowed)
+            {
+                skippedCount++;
+                Skip(item.Title, "белый список — сохранено");
+                continue;
+            }
+
             if (item.Kind == NetworkAuditKind.HostsFile && !options.CleanHostsFile)
             {
                 L($"  — Пропуск hosts (не подтверждено): {item.Title}");

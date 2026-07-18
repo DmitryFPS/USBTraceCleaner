@@ -26,7 +26,8 @@ public class NetworkAuditHintsTests
 
         var text = NetworkAuditHints.BuildCleanupWarning(items, fullClean: false);
         Assert.Contains("Выборочная очистка", text);
-        Assert.Contains("Будет очищено элементов: 1", text);
+        Assert.Contains("К очистке (вне белого списка): 1", text);
+        Assert.Contains("Элементы белого списка не удаляются", text);
     }
 
     [Fact]
@@ -57,12 +58,14 @@ public class NetworkAuditHintsTests
     {
         Assert.Contains("Wi‑Fi", NetworkAuditHints.HelpText);
         Assert.Contains("hosts", NetworkAuditHints.HostsWarning);
+        Assert.Contains("не удаляются", NetworkAuditHints.HelpText);
+        Assert.DoesNotContain("всё равно удаляется", NetworkAuditHints.HelpText);
     }
 
     [Fact]
     public void AppInfo_VersionMatchesProject()
     {
-        Assert.StartsWith("1.", AppInfo.Version);
-        Assert.StartsWith("v1.", AppInfo.VersionLabel);
+        Assert.Equal("1.7.1", AppInfo.Version);
+        Assert.Equal("v1.7.1", AppInfo.VersionLabel);
     }
 }

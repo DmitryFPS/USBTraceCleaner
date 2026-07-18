@@ -105,6 +105,9 @@
                                     <Border Style="{StaticResource OptionCard}" Margin="0,0,6,0">
                                         <StackPanel>
                                             <TextBlock Text="БЭКАП" Style="{StaticResource SectionHeader}"/>
+                                            <CheckBox x:Name="ChkSimulation" Style="{StaticResource CompactCheckBox}"
+                                                      Content="Симуляция (без удаления)" IsChecked="False"
+                                                      ToolTip="Прогон очистки без изменений реестра, файлов и журналов"/>
                                             <CheckBox x:Name="ChkBackup" Style="{StaticResource CompactCheckBox}"
                                                       Content="Сохранить .reg-бэкап" IsChecked="True"/>
                                             <CheckBox x:Name="ChkRestorePoint" Style="{StaticResource CompactCheckBox}"

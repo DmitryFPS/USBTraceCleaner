@@ -331,7 +331,7 @@ public partial class NetworkAuditView : UserControl
             DateFrom = DpFrom.SelectedDate?.Date ?? DateTime.Today.AddDays(-90),
             DateTo = (DpTo.SelectedDate?.Date ?? DateTime.Today).AddDays(1).AddSeconds(-1),
             ShowSecrets = ChkShowSecrets.IsChecked == true,
-            SimulationMode = false,
+            SimulationMode = ChkSimulation.IsChecked == true,
             RouterIp = string.IsNullOrWhiteSpace(TxtRouterIp.Text) ? null : TxtRouterIp.Text.Trim(),
             RouterLogin = string.IsNullOrWhiteSpace(TxtRouterLogin.Text) ? null : TxtRouterLogin.Text.Trim(),
             RouterPassword = TxtRouterPassword.Password,

@@ -31,13 +31,6 @@ public sealed class ArtifactCleaner
         Log($"Элементов к обработке: {itemList.Count}");
         Log("");
 
-        if (!AdminHelper.IsAdministrator())
-        {
-            result.Success = false;
-            result.ErrorMessage = "Требуются права администратора. Запустите программу от имени администратора.";
-            return result;
-        }
-
         if (!AdminHelper.IsWindows10Or11())
         {
             result.Success = false;
@@ -45,9 +38,18 @@ public sealed class ArtifactCleaner
             return result;
         }
 
+        if (!options.SimulationMode && !AdminHelper.IsAdministrator())
+        {
+            result.Success = false;
+            result.ErrorMessage = "Требуются права администратора. Запустите программу от имени администратора.";
+            return result;
+        }
+
         if (options.SimulationMode)
         {
             Log("⚠ Включён режим симуляции — реестр НЕ изменяется!");
+            if (!AdminHelper.IsAdministrator())
+                Log("⚠ Без прав администратора скан/симуляция могут быть неполными.");
             Log("");
         }
 
