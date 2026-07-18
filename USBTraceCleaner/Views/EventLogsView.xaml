@@ -120,8 +120,8 @@
                                   Content="Включать журнал «Безопасность» в очистку" IsChecked="False"
                                   Margin="0,0,20,0"/>
                         <CheckBox x:Name="ChkClearSystemLast" Style="{StaticResource CompactCheckBox}"
-                                  Content="В конце очистить «Система» (Event ID 104)" IsChecked="True"
-                                  ToolTip="После очистки других журналов Windows пишет Event ID 104 в «Система». Повторная очистка System в самом конце убирает эти записи."/>
+                                  Content="В конце полностью очистить «Система» (без остаточного 104)" IsChecked="True"
+                                  ToolTip="Обычный wevtutil всегда оставляет одну запись 104 о самой очистке System. С этой галочкой: очистка + обнуление файла System.evtx (кратко останавливается служба Журнал событий)."/>
                     </StackPanel>
                 </StackPanel>
             </Border>

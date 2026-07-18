@@ -226,8 +226,8 @@ public partial class EventLogsView : UserControl
             names += $"\n… и ещё {selected.Count - 25}";
 
         var systemNote = clearSystemLast
-            ? "\n\nВ конце журнал «Система» будет очищен ещё раз — чтобы убрать Event ID 104 от очистки других каналов."
-            : "\n\nПосле очистки в «Система» могут остаться Event ID 104 (галочка финальной очистки выключена).";
+            ? "\n\nВ конце «Система» будет полностью обнулена (wevtutil + файл System.evtx), чтобы не осталось Event ID 104."
+            : "\n\nБез финальной очистки в «Система» останутся Event ID 104.";
 
         var confirm = MessageBox.Show(
             owner,
@@ -309,11 +309,15 @@ public partial class EventLogsView : UserControl
                 foreach (var ch in selected)
                     ApplyOutcome(ch.Channel, WindowsEventLogBrowser.ClearChannel(ch.Channel));
 
-                // Финал: System ещё раз — иначе остаются 104 «журнал X очищен»
+                // Финал: убрать и 104 от других логов, и 104 от самой очистки System
                 if (clearSystemLast)
                 {
-                    reporter.Report((done, "--- Повторная очистка System (Event ID 104) ---"));
-                    ApplyOutcome("System", WindowsEventLogBrowser.ClearChannel("System"), "[OK] финал");
+                    reporter.Report((done, "--- Полная очистка System (без остаточного Event ID 104) ---"));
+                    var purgeLines = new List<string>();
+                    var purge = WindowsEventLogBrowser.PurgeSystemLogCompletely(purgeLines.Add);
+                    foreach (var pl in purgeLines)
+                        reporter.Report((done, "  " + pl));
+                    ApplyOutcome("System (полная)", purge, "[OK] финал");
                 }
 
                 return (localOk, localSkip, localDeniedCount, localFail, localDeniedList, localFails);
@@ -335,7 +339,7 @@ public partial class EventLogsView : UserControl
                 summary += $"\nОшибок: {fail}";
 
             if (clearSystemLast)
-                summary += "\n\nЖурнал «Система» очищен в конце (Event ID 104).";
+                summary += "\n\nЖурнал «Система» полностью обнулён в конце (без остаточного Event ID 104).";
 
             if (deniedDetails.Count > 0)
             {

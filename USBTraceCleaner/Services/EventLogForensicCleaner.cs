@@ -21,9 +21,11 @@ public static class EventLogForensicCleaner
     {
         foreach (var channel in ExtraChannels)
         {
-            if (channel.Equals("System", StringComparison.OrdinalIgnoreCase) && !cleanSystemLog)
+            // System — только в финальном Purge (иначе останется Event ID 104)
+            if (channel.Equals("System", StringComparison.OrdinalIgnoreCase))
             {
-                log?.Invoke("[SKIP] System event log (CleanSystemEventLog=false). UserPnp/USBSTOR в System могут остаться.");
+                if (!cleanSystemLog)
+                    log?.Invoke("[SKIP] System event log (CleanSystemEventLog=false). UserPnp/USBSTOR в System могут остаться.");
                 continue;
             }
 
@@ -38,12 +40,14 @@ public static class EventLogForensicCleaner
 
         if (!simulation && cleanSystemLog)
         {
-            // Ещё раз в самом конце — 104 от очистки UserPnp/Kernel-PnP выше
-            log?.Invoke("--- Повторная очистка System (Event ID 104) ---");
-            ClearChannel("System", log);
-            log?.Invoke("  → System очищен в конце: записи Event ID 104 убраны.");
+            log?.Invoke("--- Полная очистка System (без остаточного Event ID 104) ---");
+            var outcome = WindowsEventLogBrowser.PurgeSystemLogCompletely(log);
+            if (outcome.Ok)
+                log?.Invoke("  → System обнулён: остаточный Event ID 104 убран.");
+            else
+                log?.Invoke($"  ⚠ System: {outcome.Error}");
         }
-        else if (!simulation)
+        else if (!simulation && !cleanSystemLog)
         {
             log?.Invoke("  ⚠ После wevtutil cl в System обычно появляется Event ID 104 (признак очистки).");
         }

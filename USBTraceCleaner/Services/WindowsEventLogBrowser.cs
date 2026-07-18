@@ -2,6 +2,9 @@ using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Eventing.Reader;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.ServiceProcess;
 
 namespace USBTraceCleaner.Services;
 
@@ -239,6 +242,107 @@ public static class WindowsEventLogBrowser
         }
 
         return ClassifyClearFailure(first.Output);
+    }
+
+    /// <summary>
+    /// Обычный wevtutil cl System всегда оставляет Event ID 104 «Система очищена» —
+    /// это ограничение ОС. Чтобы убрать и его: cl → кратко остановить EventLog →
+    /// удалить System.evtx → запустить службу (Windows создаст пустой журнал).
+    /// </summary>
+    public static EventLogClearOutcome PurgeSystemLogCompletely(Action<string>? log = null)
+    {
+        log?.Invoke("wevtutil cl System…");
+        var clear = ClearChannel("System");
+        if (!clear.Ok && !clear.WasSkipped)
+            log?.Invoke($"[WARN] wevtutil System: {clear.Error}");
+
+        var evtx = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+            "System32", "winevt", "Logs", "System.evtx");
+
+        if (!File.Exists(evtx))
+        {
+            log?.Invoke("[OK] System.evtx отсутствует — нечего обнулять");
+            return EventLogClearOutcome.Success;
+        }
+
+        var stopped = TryStopService("EventLog", log);
+        try
+        {
+            ProcessExec.Run("takeown.exe", $"/F \"{evtx}\" /A", 15_000);
+            ProcessExec.Run("icacls.exe", $"\"{evtx}\" /grant Administrators:F", 15_000);
+
+            try
+            {
+                File.Delete(evtx);
+                log?.Invoke("[OK] System.evtx удалён (остаточный Event ID 104 убран)");
+                return EventLogClearOutcome.Success;
+            }
+            catch (Exception ex)
+            {
+                log?.Invoke($"[WARN] Удаление System.evtx: {ex.Message}");
+            }
+
+            // Файл занят — пометить на удаление после перезагрузки
+            if (NativeMethods.MoveFileEx(evtx, null, NativeMethods.MoveFileDelayUntilReboot))
+            {
+                log?.Invoke("[OK] System.evtx будет удалён при перезагрузке (остаточный 104 исчезнет после reboot)");
+                return EventLogClearOutcome.Success;
+            }
+
+            return EventLogClearOutcome.Failed(
+                "не удалось обнулить System.evtx — перезагрузите ПК и повторите, либо очистите вручную");
+        }
+        finally
+        {
+            if (stopped)
+                TryStartService("EventLog", log);
+        }
+    }
+
+    private static bool TryStopService(string name, Action<string>? log)
+    {
+        try
+        {
+            using var sc = new ServiceController(name);
+            if (sc.Status is ServiceControllerStatus.Stopped or ServiceControllerStatus.StopPending)
+                return false;
+
+            log?.Invoke($"Остановка службы {name}…");
+            sc.Stop();
+            sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(45));
+            return true;
+        }
+        catch (Exception ex)
+        {
+            log?.Invoke($"[WARN] Не удалось остановить {name}: {ex.Message}");
+            return false;
+        }
+    }
+
+    private static void TryStartService(string name, Action<string>? log)
+    {
+        try
+        {
+            using var sc = new ServiceController(name);
+            if (sc.Status is ServiceControllerStatus.Running or ServiceControllerStatus.StartPending)
+                return;
+            log?.Invoke($"Запуск службы {name}…");
+            sc.Start();
+            sc.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(45));
+        }
+        catch (Exception ex)
+        {
+            log?.Invoke($"[WARN] Не удалось запустить {name}: {ex.Message}");
+        }
+    }
+
+    private static class NativeMethods
+    {
+        public const int MoveFileDelayUntilReboot = 0x4;
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        public static extern bool MoveFileEx(string lpExistingFileName, string? lpNewFileName, int dwFlags);
     }
 
     private static EventLogClearOutcome ClassifyClearFailure(string output)

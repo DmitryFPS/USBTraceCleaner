@@ -143,12 +143,14 @@ public sealed class ArtifactCleaner
                 Log("");
             }
 
-            // Повторная зачистка System после wevtutil (новые 104) — если включено
+            // Полная зачистка System (wevtutil оставляет один 104 — убираем через System.evtx)
             if (!options.SimulationMode && options.CleanEventLogs && options.CleanSystemEventLog)
             {
-                Log("--- Повторная очистка System (Event ID 104) ---");
-                ClearEventLogChannel("System");
-                Log("[OK]  LOG  System (повторно)");
+                Log("--- Полная очистка System (без остаточного Event ID 104) ---");
+                var purge = WindowsEventLogBrowser.PurgeSystemLogCompletely(Log);
+                Log(purge.Ok
+                    ? "[OK]  LOG  System (файл журнала обнулён)"
+                    : $"[WARN] LOG  System: {purge.Error}");
                 Log("");
             }
 
