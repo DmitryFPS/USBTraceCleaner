@@ -77,61 +77,205 @@ public static class OtherUsbTraceCleaner
 
         RegistrySecurityHelper.EnsureDeletePrivileges();
 
+        L("--- Отключение / удаление PnP-устройств ---");
+        var instanceIds = CollectInstanceIds(orderedPaths);
+        if (instanceIds.Count > 0)
+        {
+            DeviceUninstallHelper.UninstallUsbDevices(instanceIds, L);
+            Thread.Sleep(800);
+        }
+        else
+            L("  (инстансов Enum\\USB не найдено)");
+        L("");
+
+        L("--- Удаление ключей реестра ---");
         var ok = 0;
-        var failed = 0;
+        var failedPaths = new List<string>();
         foreach (var path in orderedPaths)
         {
-            if (!RegistryHelper.KeyExists(RegistryHive.LocalMachine, path))
-            {
-                L($"[SKIP] KEY HKLM\\{path} (нет)");
+            if (TryDeleteRegistryPath(path, L))
                 ok++;
-                continue;
-            }
-
-            RegistrySecurityHelper.TakeOwnershipTree(RegistryHive.LocalMachine, path);
-            var propsPath = $@"{path}\Properties";
-            if (RegistryHelper.KeyExists(RegistryHive.LocalMachine, propsPath))
-            {
-                RegistrySecurityHelper.TakeOwnershipTree(RegistryHive.LocalMachine, propsPath);
-                RegistryNativeHelper.DeleteKeyTree(RegistryHive.LocalMachine, propsPath);
-            }
-
-            if (RegistryNativeHelper.DeleteKeyTree(RegistryHive.LocalMachine, path)
-                || RegistryHelper.DeleteKey(RegistryHive.LocalMachine, path, false, L))
-            {
-                L($"[OK]  KEY HKLM\\{path}");
-                ok++;
-            }
             else
-            {
-                L($"[FAIL] KEY HKLM\\{path}");
-                failed++;
-            }
+                failedPaths.Add(path);
         }
 
+        if (failedPaths.Count > 0)
+        {
+            L("");
+            L($"--- SYSTEM delete (упало: {failedPaths.Count}) ---");
+            var recovered = RetryFailedWithSystem(failedPaths, L);
+            ok += recovered;
+            failedPaths = failedPaths
+                .Where(p => RegistryHelper.KeyExists(RegistryHive.LocalMachine, p))
+                .ToList();
+        }
+
+        L("");
+        L("--- setupapi ---");
+        var scrubbed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var item in selected)
         {
             foreach (var logPath in OtherUsbPathCollector.CollectSetupApiLogs(item.Vid, item.Pid))
             {
+                if (!scrubbed.Add(logPath)) continue;
                 if (ScrubSetupApiForDevice(logPath, item.Vid, item.Pid, L))
                     ok++;
                 else
-                    failed++;
+                    failedPaths.Add(logPath);
             }
         }
 
         L("");
-        L(failed == 0
-            ? "✓ Выбранные следы удалены. Перезагрузите Windows."
-            : $"⚠ Ошибок: {failed}. Перезагрузите Windows и повторите при необходимости.");
+        if (failedPaths.Count == 0)
+        {
+            L("✓ Выбранные следы удалены. Перезагрузите Windows.");
+        }
+        else
+        {
+            L($"⚠ Не удалено: {failedPaths.Count}. Часто Access Denied — устройство занято драйвером.");
+            L("  Перезагрузите Windows → снова Сканировать → Очистить выбранное.");
+            L("  Неудачные пути:");
+            foreach (var p in failedPaths.Take(30))
+                L($"    • {p}");
+            if (failedPaths.Count > 30)
+                L($"    … и ещё {failedPaths.Count - 30}");
+        }
 
         return new OtherUsbTraceCleanResult
         {
-            Success = failed == 0,
+            Success = failedPaths.Count == 0,
             Processed = ok,
-            Failed = failed,
-            Log = sb.ToString()
+            Failed = failedPaths.Count,
+            FailedPaths = failedPaths,
+            Log = sb.ToString(),
+            Hint = failedPaths.Count > 0
+                ? "Перезагрузите Windows и повторите очистку. «Найдено: 0» после частичного удаления не гарантирует полный wipe."
+                : null
         };
+    }
+
+    private static List<string> CollectInstanceIds(IEnumerable<string> registryPaths)
+    {
+        var ids = new List<string>();
+        foreach (var path in registryPaths)
+        {
+            // SYSTEM\ControlSet001\Enum\USB\VID_xxxx&PID_yyyy\instance
+            const string marker = @"\Enum\";
+            var idx = path.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            if (idx < 0) continue;
+
+            var relative = path[(idx + marker.Length)..];
+            if (!relative.StartsWith("USB\\", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (relative.EndsWith(@"\Properties", StringComparison.OrdinalIgnoreCase))
+                relative = relative[..^@"\Properties".Length];
+
+            // Нужен полный instance ID: USB\VID_..\PID_..\serial
+            if (relative.Count(c => c == '\\') < 2)
+                continue;
+
+            ids.Add(relative);
+        }
+        return ids.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private static bool TryDeleteRegistryPath(string path, Action<string> log)
+    {
+        if (!RegistryHelper.KeyExists(RegistryHive.LocalMachine, path))
+        {
+            log($"[SKIP] KEY HKLM\\{path} (нет)");
+            return true;
+        }
+
+        RegistrySecurityHelper.TakeOwnershipTree(RegistryHive.LocalMachine, path);
+        var propsPath = $@"{path}\Properties";
+        if (RegistryHelper.KeyExists(RegistryHive.LocalMachine, propsPath))
+        {
+            RegistrySecurityHelper.TakeOwnershipTree(RegistryHive.LocalMachine, propsPath);
+            RegistryNativeHelper.DeleteKeyTree(RegistryHive.LocalMachine, propsPath);
+        }
+
+        if (RegistryNativeHelper.DeleteKeyTree(RegistryHive.LocalMachine, path)
+            && !RegistryHelper.KeyExists(RegistryHive.LocalMachine, path))
+        {
+            log($"[OK]  KEY HKLM\\{path}");
+            return true;
+        }
+
+        if (RegistryHelper.DeleteKey(RegistryHive.LocalMachine, path, false, log)
+            && !RegistryHelper.KeyExists(RegistryHive.LocalMachine, path))
+            return true;
+
+        if (RegistryHelper.IsSystemDeleteCandidate(path)
+            && RegistrySystemHelper.TryRegDeleteAsSystem("HKLM", path)
+            && !RegistryHelper.KeyExists(RegistryHive.LocalMachine, path))
+        {
+            log($"[OK]  KEY HKLM\\{path} (SYSTEM)");
+            return true;
+        }
+
+        if (!RegistryHelper.KeyExists(RegistryHive.LocalMachine, path))
+        {
+            log($"[OK]  KEY HKLM\\{path} (уже удалён)");
+            return true;
+        }
+
+        var reason = RegistryNativeHelper.LastErrorCode switch
+        {
+            5 => "Access Denied (устройство занято / ACL)",
+            2 => "не найден",
+            0 => "ключ остался после delete",
+            _ => $"код {RegistryNativeHelper.LastErrorCode}"
+        };
+        log($"[FAIL] KEY HKLM\\{path} — {reason}");
+        return false;
+    }
+
+    private static int RetryFailedWithSystem(List<string> failedPaths, Action<string> log)
+    {
+        var candidates = failedPaths
+            .Where(RegistryHelper.IsSystemDeleteCandidate)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(p => p.Length)
+            .Select(p => $"HKLM\\{p}")
+            .ToList();
+
+        if (candidates.Count == 0)
+        {
+            log("  Нет кандидатов для SYSTEM delete");
+            return 0;
+        }
+
+        var recovered = 0;
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            log($"  Попытка {attempt}/3: {candidates.Count} путей…");
+            RegistrySystemHelper.TryBatchRegDeleteAsSystem(candidates);
+            Thread.Sleep(400 * attempt);
+
+            var still = new List<string>();
+            foreach (var full in candidates)
+            {
+                var sub = full.StartsWith("HKLM\\", StringComparison.OrdinalIgnoreCase)
+                    ? full[5..]
+                    : full;
+                if (RegistryHelper.KeyExists(RegistryHive.LocalMachine, sub))
+                    still.Add(full);
+                else
+                {
+                    log($"[OK]  KEY {full} (SYSTEM batch)");
+                    recovered++;
+                }
+            }
+
+            candidates = still;
+            if (candidates.Count == 0) break;
+        }
+
+        if (candidates.Count > 0)
+            log($"  Осталось после SYSTEM: {candidates.Count}");
+
+        return recovered;
     }
 
     private static bool ScrubSetupApiForDevice(string path, string vid, string pid, Action<string> log)

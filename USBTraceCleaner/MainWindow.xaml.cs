@@ -223,6 +223,17 @@ public partial class MainWindow : Window
             CleanBamEntries = ChkBam.IsChecked == true,
             ScrubLogFiles = ChkScrubLogs.IsChecked == true,
             PreserveLogFileTimestamps = ChkPreserveLogDates.IsChecked == true,
+            CleanExecutionArtifacts = ChkExecution.IsChecked == true,
+            CleanExplorerMru = ChkExplorerMru.IsChecked == true,
+            CleanRecycleBinUsb = ChkRecycle.IsChecked == true,
+            CleanVolumeShadowCopies = ChkVss.IsChecked == true,
+            CleanSelfTraces = ChkSelfTraces.IsChecked == true,
+            CleanSystemEventLog = ChkSystemLog.IsChecked == true,
+            CleanOrphanUsbFlags = true,
+            CleanAllUsbFlags = true,
+            FilterUserAssist = true,
+            TryOfflineHiveClean = true,
+            CleanEventLogs = true,
         };
     }
 

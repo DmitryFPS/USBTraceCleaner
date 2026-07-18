@@ -59,7 +59,6 @@ public sealed class ArtifactScanner
         @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Portable Devices",
         @"SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache",
         @"SOFTWARE\Microsoft\Windows\ShellNoRoam\MuiCache",
-        @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\UserAssist",
         @"SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\SyncMgr\HandlerInstances",
     ];
 
@@ -98,6 +97,7 @@ public sealed class ArtifactScanner
         "Microsoft-Windows-Storage-ClassPnP/Operational",
         "Microsoft-Windows-WPD-MTPClassDriver/Operational",
         "Microsoft-Windows-UserPnp/DeviceInstall",
+        "Microsoft-Windows-UserPnp/Operational",
         "HardwareEvents",
     ];
 
@@ -132,9 +132,18 @@ public sealed class ArtifactScanner
 
         if (options.CleanRecentLinks)
         {
-            progress?.Report(new CleanupProgress { Phase = "Сканирование ярлыков Recent..." });
-            ScanRecentLinks(items, driveMask);
+            progress?.Report(new CleanupProgress { Phase = "Сканирование ярлыков Recent / Jump Lists..." });
+            ScanRecentLinks(items, driveMask, options);
         }
+
+        if (options.CleanBamEntries && options.CleanSelfTraces)
+        {
+            progress?.Report(new CleanupProgress { Phase = "Сканирование BAM/DAM (self-trace)..." });
+            ScanBamDamSelfTraces(items);
+        }
+
+        progress?.Report(new CleanupProgress { Phase = "Расширенные forensic-артефакты..." });
+        ExtendedForensicScanner.ScanAll(items, options, driveMask);
 
         if (options.ScanPnPGhosts)
         {
@@ -502,6 +511,12 @@ public sealed class ArtifactScanner
                     AddKey(items, ArtifactCategory.RegistryShell, $@"{sid}\{bagKey}");
             }
 
+            if (!options.FilterUserAssist)
+            {
+                AddKey(items, ArtifactCategory.RegistryUser,
+                    $@"{sid}\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\UserAssist");
+            }
+
             ScanMountPoints2(items, sid, driveMask);
         }
     }
@@ -567,6 +582,33 @@ public sealed class ArtifactScanner
         }
     }
 
+    private static void ScanBamDamSelfTraces(ConcurrentBag<ArtifactItem> items)
+    {
+        foreach (var service in new[] { "bam", "dam" })
+        {
+            var statePath = $@"SYSTEM\CurrentControlSet\Services\{service}\State\UserSettings";
+            RegistryHelper.SafeOpen(stateKey =>
+            {
+                foreach (var userSid in stateKey.GetSubKeyNames())
+                {
+                    var userPath = $@"{statePath}\{userSid}";
+                    RegistryHelper.SafeOpen(userKey =>
+                    {
+                        foreach (var valueName in userKey.GetValueNames())
+                        {
+                            if (!ForensicTracePatterns.ContainsSelfTraceToken(valueName)
+                                && !ForensicTracePatterns.ContainsUsbStorageToken(valueName))
+                                continue;
+
+                            AddValue(items, ArtifactCategory.RegistrySystem, userPath, valueName,
+                                "BAM/DAM: USB / утилита очистки");
+                        }
+                    }, RegistryHive.LocalMachine, userPath);
+                }
+            }, RegistryHive.LocalMachine, statePath);
+        }
+    }
+
     private static void ScanLogFiles(ConcurrentBag<ArtifactItem> items)
     {
         foreach (var pattern in LogFilePatterns)
@@ -594,7 +636,7 @@ public sealed class ArtifactScanner
         }
     }
 
-    private static void ScanRecentLinks(ConcurrentBag<ArtifactItem> items, int driveMask)
+    private static void ScanRecentLinks(ConcurrentBag<ArtifactItem> items, int driveMask, CleanupOptions options)
     {
         var usersDir = new DirectoryInfo(@"C:\Users");
         if (!usersDir.Exists) return;
@@ -610,50 +652,70 @@ public sealed class ArtifactScanner
             {
                 try
                 {
-                    if (ContainsRemovableDriveReference(lnk, driveMask))
+                    if (ContainsRemovableOrSelfReference(lnk, driveMask, options))
                     {
                         items.Add(new ArtifactItem
                         {
                             Category = ArtifactCategory.FileSystem,
                             Type = ArtifactType.File,
                             Location = lnk,
-                            Description = "Ярлык Recent со ссылкой на съёмный носитель"
+                            Description = "Ярлык Recent — USB / self-trace"
                         });
                     }
                 }
                 catch { /* ignore unreadable lnk */ }
             }
 
-            var autoDest = Path.Combine(userDir.FullName, @"AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations-ms");
-            if (Directory.Exists(autoDest))
+            foreach (var folder in new[] { "AutomaticDestinations", "CustomDestinations" })
             {
-                foreach (var jumplist in Directory.EnumerateFiles(autoDest))
+                var destDir = Path.Combine(recentDir, folder);
+                if (!Directory.Exists(destDir)) continue;
+
+                foreach (var jumplist in Directory.EnumerateFiles(destDir))
                 {
+                    var include = true;
+                    if (options.CleanSelfTraces)
+                    {
+                        try
+                        {
+                            var bytes = File.ReadAllBytes(jumplist);
+                            var text = Encoding.Unicode.GetString(bytes);
+                            include = ForensicTracePatterns.IsUsbOrSelfTrace(text)
+                                      || ForensicTracePatterns.MatchesRemovableDriveLetter(text, driveMask)
+                                      || options.CleanRecentLinks; // при включённых Jump Lists — все файлы папки
+                        }
+                        catch { include = true; }
+                    }
+
+                    if (!include) continue;
+
                     items.Add(new ArtifactItem
                     {
                         Category = ArtifactCategory.FileSystem,
                         Type = ArtifactType.File,
                         Location = jumplist,
-                        Description = "Jump List (AutomaticDestinations) — может содержать USB-пути"
+                        Description = $"Jump List ({folder})"
                     });
                 }
             }
         }
     }
 
-    private static bool ContainsRemovableDriveReference(string lnkPath, int driveMask)
+    private static bool ContainsRemovableOrSelfReference(string lnkPath, int driveMask, CleanupOptions options)
     {
         var bytes = File.ReadAllBytes(lnkPath);
         var content = Encoding.Unicode.GetString(bytes);
+        var name = Path.GetFileName(lnkPath);
 
-        for (char c = 'D'; c <= 'Z'; c++)
-        {
-            if (content.Contains($"{c}:\\", StringComparison.OrdinalIgnoreCase) &&
-                !RegistryHelper.IsDriveConnected(driveMask, c))
-                return true;
-        }
-        return content.Contains("USBSTOR", StringComparison.OrdinalIgnoreCase) ||
-               content.Contains("Removable", StringComparison.OrdinalIgnoreCase);
+        if (ForensicTracePatterns.MatchesRemovableDriveLetter(content, driveMask))
+            return true;
+        if (ForensicTracePatterns.ContainsUsbStorageToken(content))
+            return true;
+        if (options.CleanSelfTraces
+            && (ForensicTracePatterns.ContainsSelfTraceToken(content)
+                || ForensicTracePatterns.ContainsSelfTraceToken(name)))
+            return true;
+        return false;
     }
 
     private static string? GetRegistryString(RegistryHive hive, string subKey, string valueName)

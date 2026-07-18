@@ -174,8 +174,15 @@ public static class ReportExportService
                 o.CleanMtpDevices ? "MTP" : null,
                 o.ScrubLogFiles ? "чистка логов" : null,
                 o.CleanShellBags ? "ShellBags" : null,
-                o.CleanRecentLinks ? "Recent" : null,
-                o.CleanBamEntries ? "BAM/DAM" : null
+                o.CleanRecentLinks ? "Recent/JumpLists" : null,
+                o.CleanBamEntries ? "BAM/DAM" : null,
+                o.CleanExecutionArtifacts ? "Prefetch/Amcache/Shimcache" : null,
+                o.CleanExplorerMru ? "Explorer MRU" : null,
+                o.CleanRecycleBinUsb ? "Recycle Bin" : null,
+                o.CleanVolumeShadowCopies ? "VSS" : null,
+                o.CleanSelfTraces ? "self-trace" : null,
+                o.CleanSystemEventLog ? "System log" : null,
+                o.CleanAllUsbFlags ? "все usbflags" : null
             }.Where(s => s != null));
 
     private static string FormatNetworkOptions(NetworkAuditOptions o) =>

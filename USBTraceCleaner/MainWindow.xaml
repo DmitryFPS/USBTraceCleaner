@@ -102,7 +102,7 @@
                                             <CheckBox x:Name="ChkBackup" Style="{StaticResource CompactCheckBox}"
                                                       Content="Сохранить .reg-бэкап" IsChecked="True"/>
                                             <CheckBox x:Name="ChkRestorePoint" Style="{StaticResource CompactCheckBox}"
-                                                      Content="Точка восстановления" IsChecked="True"/>
+                                                      Content="Точка восстановления" IsChecked="False"/>
                                         </StackPanel>
                                     </Border>
                                     <Border Style="{StaticResource OptionCard}" Margin="3,0">
@@ -118,7 +118,7 @@
                                     </Border>
                                     <Border Style="{StaticResource OptionCard}" Margin="6,0,0,0">
                                         <StackPanel>
-                                            <TextBlock Text="ЛОГИ И СЛЕДЫ EXPLORER" Style="{StaticResource SectionHeader}"/>
+                                            <TextBlock Text="ЛОГИ И FORENSIC" Style="{StaticResource SectionHeader}"/>
                                             <CheckBox x:Name="ChkScrubLogs" Style="{StaticResource CompactCheckBox}"
                                                       Content="Чистить логи (кроме setupapi.dev.log)" IsChecked="True"/>
                                             <CheckBox x:Name="ChkPreserveLogDates" Style="{StaticResource CompactCheckBox}"
@@ -129,6 +129,18 @@
                                                       Content="Recent / Jump Lists" IsChecked="True"/>
                                             <CheckBox x:Name="ChkBam" Style="{StaticResource CompactCheckBox}"
                                                       Content="BAM/DAM" IsChecked="True"/>
+                                            <CheckBox x:Name="ChkExecution" Style="{StaticResource CompactCheckBox}"
+                                                      Content="Prefetch / Amcache / Shimcache" IsChecked="True"/>
+                                            <CheckBox x:Name="ChkExplorerMru" Style="{StaticResource CompactCheckBox}"
+                                                      Content="RecentDocs / TypedPaths / MRU" IsChecked="True"/>
+                                            <CheckBox x:Name="ChkRecycle" Style="{StaticResource CompactCheckBox}"
+                                                      Content="Recycle Bin (USB)" IsChecked="True"/>
+                                            <CheckBox x:Name="ChkVss" Style="{StaticResource CompactCheckBox}"
+                                                      Content="Удалить VSS (теневые копии)" IsChecked="True"/>
+                                            <CheckBox x:Name="ChkSelfTraces" Style="{StaticResource CompactCheckBox}"
+                                                      Content="Self-trace утилит очистки" IsChecked="True"/>
+                                            <CheckBox x:Name="ChkSystemLog" Style="{StaticResource CompactCheckBox}"
+                                                      Content="Журнал System (UserPnp/104)" IsChecked="True"/>
                                         </StackPanel>
                                     </Border>
                                 </UniformGrid>

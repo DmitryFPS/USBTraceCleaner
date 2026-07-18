@@ -231,7 +231,7 @@ public static class UsboOblivionCleanup
 
         CollectStaticDeviceClassKeys(paths, prefix);
 
-        CollectUsbFlags(paths, vidPidIds, prefix);
+        CollectUsbFlags(paths, vidPidIds, prefix, options);
 
 
 
@@ -508,44 +508,54 @@ public static class UsboOblivionCleanup
 
 
 
-    private static void CollectUsbFlags(HashSet<string> paths, HashSet<string> vidPidIds, string prefix)
-
+    private static void CollectUsbFlags(
+        HashSet<string> paths, HashSet<string> vidPidIds, string prefix, CleanupOptions options)
     {
-
         var flagsPath = $@"{prefix}\Control\usbflags";
-
         RegistryHelper.SafeOpen(flagsKey =>
-
         {
-
             foreach (var flagName in flagsKey.GetSubKeyNames())
-
             {
-
-                if (flagName.Length < 8) continue;
-
-                var usbflagsId = $"vid_{flagName[..4]}&pid_{flagName[4..8]}";
-
-                foreach (var vidPid in vidPidIds)
-
+                if (options.CleanAllUsbFlags)
                 {
-
-                    if (vidPid.Equals(usbflagsId, StringComparison.OrdinalIgnoreCase))
-
-                    {
-
-                        AddKey(paths, $@"{flagsPath}\{flagName}");
-
-                        break;
-
-                    }
-
+                    AddKey(paths, $@"{flagsPath}\{flagName}");
+                    continue;
                 }
 
+                if (!ForensicTracePatterns.TryParseUsbFlagsName(flagName, out var vid, out var pid))
+                    continue;
+
+                var usbflagsId = $"vid_{vid}&pid_{pid}";
+                var matchedStorage = false;
+                foreach (var vidPid in vidPidIds)
+                {
+                    if (vidPid.Equals(usbflagsId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        matchedStorage = true;
+                        break;
+                    }
+                }
+
+                if (matchedStorage)
+                {
+                    AddKey(paths, $@"{flagsPath}\{flagName}");
+                    continue;
+                }
+
+                if (!options.CleanOrphanUsbFlags)
+                    continue;
+
+                var enumPath = $@"{prefix}\Enum\USB\VID_{vid}&PID_{pid}";
+                var hasInstances = false;
+                RegistryHelper.SafeOpen(enumKey =>
+                {
+                    hasInstances = enumKey.GetSubKeyNames().Length > 0;
+                }, RegistryHive.LocalMachine, enumPath);
+
+                if (!hasInstances)
+                    AddKey(paths, $@"{flagsPath}\{flagName}");
             }
-
         }, RegistryHive.LocalMachine, flagsPath);
-
     }
 
 

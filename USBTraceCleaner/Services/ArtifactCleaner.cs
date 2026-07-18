@@ -87,6 +87,11 @@ public sealed class ArtifactCleaner
                 progress?.Report(new CleanupProgress { Phase = "Очистка журналов событий..." });
                 foreach (var item in ordered.Where(i => i.Type == ArtifactType.EventLog))
                     ClearEventLogChannel(item.Location);
+
+                Log("--- Доп. журналы (UserPnp / System) ---");
+                EventLogForensicCleaner.ClearExtraChannels(
+                    options.CleanSystemEventLog, options.SimulationMode, Log);
+                Log("");
             }
 
             var processed = 0;
@@ -108,6 +113,16 @@ public sealed class ArtifactCleaner
             }
 
             if (!options.SimulationMode)
+            {
+                OfflineHiveHelper.TryCleanUsbStorFromOfflineOrRetry(options, Log);
+
+                if (options.CleanVolumeShadowCopies)
+                    VolumeShadowCopyCleaner.DeleteAllShadows(false, Log);
+
+                SelfTraceCleaner.Run(options, Log);
+            }
+
+            if (!options.SimulationMode)
                 VerifyCleanup();
 
             if (!options.SimulationMode)
@@ -125,6 +140,15 @@ public sealed class ArtifactCleaner
             {
                 Log("--- Восстановление setupapi.dev.log (если отсутствует) ---");
                 LogFileScrubber.EnsureCriticalSetupApiLogs(false, options.PreserveLogFileTimestamps, Log);
+                Log("");
+            }
+
+            // Повторная зачистка System после wevtutil (новые 104) — если включено
+            if (!options.SimulationMode && options.CleanEventLogs && options.CleanSystemEventLog)
+            {
+                Log("--- Повторная очистка System (Event ID 104) ---");
+                ClearEventLogChannel("System");
+                Log("[OK]  LOG  System (повторно)");
                 Log("");
             }
 
@@ -355,6 +379,14 @@ public sealed class ArtifactCleaner
                     break;
 
                 case ArtifactType.File:
+                    if (string.Equals(item.Detail, "amcache-scrub", StringComparison.OrdinalIgnoreCase)
+                        || item.Location.EndsWith("Amcache.hve", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!AmcacheCleaner.Scrub(item.Location, simulation, Log))
+                            _failCount++;
+                        break;
+                    }
+
                     if (!simulation)
                     {
                         if (options.ScrubLogFiles && LogFileScrubber.IsManagedLogFile(item.Location))

@@ -43,6 +43,9 @@ public sealed class OtherUsbTraceCleanResult
     public bool Success { get; init; }
     public int Processed { get; init; }
     public int Failed { get; init; }
+    public IReadOnlyList<string> FailedPaths { get; init; } = [];
     public string Log { get; init; } = "";
     public string? ErrorMessage { get; init; }
+    /// <summary>Подсказка для UI после частичной очистки.</summary>
+    public string? Hint { get; init; }
 }

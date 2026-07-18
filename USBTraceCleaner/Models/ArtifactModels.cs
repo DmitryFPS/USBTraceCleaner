@@ -168,7 +168,8 @@ public sealed class CleanupOptions
 {
     public bool SimulationMode { get; set; } = false;
     public bool SaveBackup { get; set; } = true;
-    public bool CreateRestorePoint { get; set; } = true;
+    /// <summary>По умолчанию выкл.: точка восстановления сама оставляет артефакт USBTraceCleaner.</summary>
+    public bool CreateRestorePoint { get; set; } = false;
     public bool CloseExplorer { get; set; } = true;
     public bool RebootAfterClean { get; set; } = true;
     public bool CleanMtpDevices { get; set; } = true;
@@ -186,6 +187,28 @@ public sealed class CleanupOptions
     public bool PreserveLogFileTimestamps { get; set; } = true;
     /// <summary>Искать призрачные и дублированные записи PnP при сканировании.</summary>
     public bool ScanPnPGhosts { get; set; } = true;
+
+    /// <summary>Prefetch / Amcache / AppCompatCache (Shimcache).</summary>
+    public bool CleanExecutionArtifacts { get; set; } = true;
+    /// <summary>RecentDocs, TypedPaths, OpenSavePidlMRU, LastVisitedPidlMRU.</summary>
+    public bool CleanExplorerMru { get; set; } = true;
+    /// <summary>$Recycle.Bin записи с USB/removable путями.</summary>
+    public bool CleanRecycleBinUsb { get; set; } = true;
+    /// <summary>Удалить все Volume Shadow Copies (иначе setupapi возвращается из VSS).</summary>
+    public bool CleanVolumeShadowCopies { get; set; } = true;
+    /// <summary>Следы USBTraceCleaner / USBOblivion / USBDeview / USBDetector.</summary>
+    public bool CleanSelfTraces { get; set; } = true;
+    /// <summary>Очистить журнал System (UserPnp USBSTOR + прошлые Event ID 104).</summary>
+    public bool CleanSystemEventLog { get; set; } = true;
+    /// <summary>Удалять осиротевшие usbflags и IgnoreHWSerNum* в core-пути.</summary>
+    public bool CleanOrphanUsbFlags { get; set; } = true;
+    /// <summary>Удалить весь Control\usbflags (пересоздаётся при следующем PnP).</summary>
+    public bool CleanAllUsbFlags { get; set; } = true;
+    /// <summary>UserAssist — только USB/self-trace значения, не весь ключ.</summary>
+    public bool FilterUserAssist { get; set; } = true;
+    /// <summary>Offline hive copy + усиленный SYSTEM retry для USBSTOR/WPDBUSENUM.</summary>
+    public bool TryOfflineHiveClean { get; set; } = true;
+
     public string? BackupPath { get; set; }
     public string? LogPath { get; set; }
 }

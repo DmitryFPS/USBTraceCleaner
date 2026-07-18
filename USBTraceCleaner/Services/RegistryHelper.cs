@@ -225,9 +225,9 @@ public static class RegistryHelper
             return true;
         }
 
-        // 4) reg delete от SYSTEM — только для одиночных ключей, не для массовой очистки артефактов
+        // 4) reg delete от SYSTEM — USBSTOR и «другие» USB-следы (Enum\USB, usbflags, …)
         if (subKey.StartsWith(@"SYSTEM\", StringComparison.OrdinalIgnoreCase)
-            && subKey.Contains(@"\Enum\USBSTOR\", StringComparison.OrdinalIgnoreCase)
+            && IsSystemDeleteCandidate(subKey)
             && RegistrySystemHelper.TryRegDeleteAsSystem(prefix, subKey)
             && !KeyExists(hive, subKey))
         {
@@ -395,6 +395,19 @@ public static class RegistryHelper
         RegistryHive.Users => new IntPtr(unchecked((int)0x80000003)),
         _ => IntPtr.Zero
     };
+
+    /// <summary>Пути, для которых разрешён reg delete от SYSTEM.</summary>
+    internal static bool IsSystemDeleteCandidate(string subKey) =>
+        subKey.Contains(@"\Enum\USBSTOR", StringComparison.OrdinalIgnoreCase)
+        || subKey.Contains(@"\Enum\USB\", StringComparison.OrdinalIgnoreCase)
+        || subKey.Contains(@"\Enum\USBPRINT", StringComparison.OrdinalIgnoreCase)
+        || subKey.Contains(@"\Control\usbflags", StringComparison.OrdinalIgnoreCase)
+        || subKey.Contains(@"\Control\DeviceClasses\", StringComparison.OrdinalIgnoreCase)
+        || subKey.Contains(@"\Control\DeviceContainers\", StringComparison.OrdinalIgnoreCase)
+        || subKey.Contains(@"\Control\DeviceMigration", StringComparison.OrdinalIgnoreCase)
+        || subKey.Contains(@"\Control\Class\", StringComparison.OrdinalIgnoreCase)
+        || subKey.Contains(@"\Setup\Upgrade", StringComparison.OrdinalIgnoreCase)
+        || subKey.Contains(@"\Enum\SWD\WPDBUSENUM", StringComparison.OrdinalIgnoreCase);
 
     private static string GetHivePrefix(RegistryHive hive) => hive switch
     {

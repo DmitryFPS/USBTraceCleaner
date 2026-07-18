@@ -108,8 +108,20 @@ public partial class OtherUsbTraceView : UserControl
 
             await ScanAsync();
 
+            var msg = $"Обработано ключей: {result.Processed}\nОшибок: {result.Failed}\n\nПерезагрузите Windows.";
+            if (result.Failed > 0 && result.FailedPaths.Count > 0)
+            {
+                msg += "\n\nНе удалено (первые пути):\n";
+                foreach (var p in result.FailedPaths.Take(8))
+                    msg += $"• {p}\n";
+                if (result.FailedPaths.Count > 8)
+                    msg += $"… и ещё {result.FailedPaths.Count - 8}\n";
+            }
+            if (!string.IsNullOrWhiteSpace(result.Hint))
+                msg += $"\n{result.Hint}";
+
             MessageBox.Show(
-                $"Обработано ключей: {result.Processed}\nОшибок: {result.Failed}\n\nПерезагрузите Windows.",
+                msg,
                 "Готово",
                 MessageBoxButton.OK,
                 result.Failed > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);

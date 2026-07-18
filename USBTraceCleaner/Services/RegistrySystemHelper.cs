@@ -20,6 +20,19 @@ public static class RegistrySystemHelper
         var paths = fullPaths.Where(p => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (paths.Count == 0) return true;
 
+        // До 3 попыток: WPDBUSENUM часто отдаёт Access Denied с первого раза
+        var ok = false;
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            ok = RunSystemDeleteOnce(paths);
+            if (ok) break;
+            Thread.Sleep(750 * attempt);
+        }
+        return ok;
+    }
+
+    private static bool RunSystemDeleteOnce(List<string> paths)
+    {
         var taskId = Guid.NewGuid().ToString("N");
         var taskName = "USBTC_" + taskId;
         var scriptPath = Path.Combine(SystemTemp, taskName + ".ps1");
@@ -36,6 +49,7 @@ public static class RegistrySystemHelper
             {
                 var quoted = path.Replace("'", "''");
                 script.AppendLine($"& reg.exe delete '{quoted}' /f | Out-Null");
+                script.AppendLine("if ($LASTEXITCODE -ne 0) { Start-Sleep -Milliseconds 200; & reg.exe delete '{quoted}' /f | Out-Null }");
                 script.AppendLine("if ($LASTEXITCODE -ne 0) { $err = 1 }");
             }
             script.AppendLine($"Set-Content -LiteralPath '{exitFile.Replace("'", "''")}' -Value $err -Encoding ASCII");

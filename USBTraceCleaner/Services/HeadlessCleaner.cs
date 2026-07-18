@@ -3,7 +3,7 @@ using USBTraceCleaner.Models;
 
 namespace USBTraceCleaner.Services;
 
-// USBTraceCleaner.exe --clean
+// USBTraceCleaner.exe --clean  (полный forensic-путь, как GUI с максимальными опциями)
 [ExcludeFromCodeCoverage]
 public static class HeadlessCleaner
 {
@@ -26,15 +26,35 @@ public static class HeadlessCleaner
             CleanAllUsbDevices = false,
             CleanMtpDevices = true,
             ExportFullUsbEnum = false,
-            CleanEventLogs = false,
+            CleanEventLogs = true,
+            CleanSystemEventLog = true,
             ScrubLogFiles = true,
-            PreserveLogFileTimestamps = true
+            PreserveLogFileTimestamps = true,
+            CleanShellBags = true,
+            CleanRecentLinks = true,
+            CleanBamEntries = true,
+            CleanExecutionArtifacts = true,
+            CleanExplorerMru = true,
+            CleanRecycleBinUsb = true,
+            CleanVolumeShadowCopies = true,
+            CleanSelfTraces = true,
+            CleanOrphanUsbFlags = true,
+            CleanAllUsbFlags = true,
+            FilterUserAssist = true,
+            TryOfflineHiveClean = true,
+            ScanPnPGhosts = true,
         };
 
         var before = RegistryHelper.CountUsbStorageTraceDevices(includeMtp: options.CleanMtpDevices);
         Console.WriteLine($"USB-накопители до очистки: {before}");
 
-        var result = new ArtifactCleaner().ExecuteUsboOblivionAsync(options).GetAwaiter().GetResult();
+        Console.WriteLine("Сканирование артефактов...");
+        var items = new ArtifactScanner().Scan(options);
+        foreach (var item in items)
+            item.Selected = true;
+
+        Console.WriteLine($"Найдено элементов: {items.Count}");
+        var result = new ArtifactCleaner().ExecuteAsync(items, options).GetAwaiter().GetResult();
         Console.WriteLine(result.Log);
 
         var after = RegistryHelper.CountUsbStorageTraceDevices(includeMtp: options.CleanMtpDevices);
