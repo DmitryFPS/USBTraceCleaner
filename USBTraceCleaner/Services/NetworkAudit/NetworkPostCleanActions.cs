@@ -73,8 +73,9 @@ public static class NetworkPostCleanActions
         log?.Invoke($"  ✓ Перезагрузка через {seconds} сек.");
     }
 
-    public static void StopBlockingServices(Action<string>? log = null)
+    public static List<string> StopBlockingServices(Action<string>? log = null)
     {
+        var stopped = new List<string>();
         foreach (var name in new[] { "DPS", "DiagTrack" })
         {
             try
@@ -83,6 +84,7 @@ public static class NetworkPostCleanActions
                 if (sc.Status == ServiceControllerStatus.Running)
                 {
                     sc.Stop();
+                    stopped.Add(name);
                     sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(30));
                     log?.Invoke($"  ✓ Служба остановлена: {name}");
                 }
@@ -92,15 +94,18 @@ public static class NetworkPostCleanActions
                 log?.Invoke($"  — Служба {name}: {ex.Message}");
             }
         }
+        return stopped;
     }
 
-    public static void StartBlockingServices(Action<string>? log = null)
+    public static void StartBlockingServices(Action<string>? log = null, IEnumerable<string>? stopped = null)
     {
-        foreach (var name in new[] { "DPS", "DiagTrack" })
+        foreach (var name in stopped ?? [])
         {
             try
             {
                 using var sc = new ServiceController(name);
+                if (sc.Status == ServiceControllerStatus.StopPending)
+                    sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(30));
                 if (sc.Status == ServiceControllerStatus.Stopped)
                 {
                     sc.Start();
@@ -116,7 +121,7 @@ public static class NetworkPostCleanActions
         var sruDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "sru");
         var sruFile = Path.Combine(sruDir, "SRUDB.dat");
 
-        StopBlockingServices(log);
+        var stopped = StopBlockingServices(log);
         Thread.Sleep(500);
 
         try
@@ -143,7 +148,7 @@ public static class NetworkPostCleanActions
         }
         finally
         {
-            StartBlockingServices(log);
+            StartBlockingServices(log, stopped);
         }
     }
 

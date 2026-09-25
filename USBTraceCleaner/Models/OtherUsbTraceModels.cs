@@ -11,7 +11,15 @@ public enum OtherUsbTraceSource
 
 public sealed class OtherUsbTraceItem
 {
-    public bool Selected { get; set; } = true;
+    private bool _selected;
+    public bool Selected { get => _selected && CanSelect; set => _selected = value && CanSelect; }
+    public string DeviceName { get; set; } = "Устройство не определено";
+    public string DeviceNameSource { get; set; } = "";
+    public bool? DevicePresent { get; set; }
+    public IReadOnlyList<string> RelatedDeviceIds { get; set; } = [];
+    public bool CanSelect => DevicePresent != true;
+    public string DisplayConnection => DevicePresent == true ? "Подключено · защищено" :
+        DevicePresent == false ? "Не подключено" : "Состояние неизвестно";
     public required string Vid { get; init; }
     public required string Pid { get; init; }
     public string Manufacturer { get; init; } = "—";

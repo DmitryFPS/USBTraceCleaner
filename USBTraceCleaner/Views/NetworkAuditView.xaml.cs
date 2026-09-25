@@ -44,8 +44,8 @@ public partial class NetworkAuditView : UserControl
         ChkShowUnknownOnly.Unchecked += (_, _) => { _view.Refresh(); UpdateCount(); };
 
         AppendLog($"Аудит сети {AppInfo.VersionLabel} — Windows 10/11");
-        AppendLog("«Разрешено» = ваше подключение; при очистке удаляется вместе с остальными.");
-        AppendLog("Максимальная очистка: все следы на ПК, отключение сети, перезагрузка.");
+        AppendLog("«Разрешено» = запись из вашего белого списка; при очистке сохраняется.");
+        AppendLog("Очистка обрабатывает выбранные записи. Отключение сети и перезагрузка — отдельные настройки.");
         AppendLog("");
     }
 
@@ -146,14 +146,14 @@ public partial class NetworkAuditView : UserControl
 
     public async Task CleanAsync()
     {
-        if (!AdminHelper.IsAdministrator())
+        var options = BuildOptions();
+        if (!options.SimulationMode && !AdminHelper.IsAdministrator())
         {
             MessageBox.Show("Запустите программу от имени администратора.", "Нужны права",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
-        var options = BuildOptions();
         var fullClean = options.FullCleanMode;
 
         if (fullClean)
@@ -170,7 +170,7 @@ public partial class NetworkAuditView : UserControl
             return;
         }
 
-        if (fullClean && IsVpnAdapterActive())
+        if (!options.SimulationMode && fullClean && IsVpnAdapterActive())
         {
             var vpnWarn = MessageBox.Show(
                 "Обнаружен активный VPN-адаптер (happ-tun или другой туннель).\n\n" +
@@ -182,7 +182,7 @@ public partial class NetworkAuditView : UserControl
             if (vpnWarn != MessageBoxResult.Yes) return;
         }
 
-        if (_items.Any(i => i.Kind == NetworkAuditKind.HostsFile && i.CanClean))
+        if (!options.SimulationMode && _items.Any(i => i.Selected && i.Kind == NetworkAuditKind.HostsFile && i.CanClean))
         {
             var hostsAnswer = MessageBox.Show(
                 NetworkAuditHints.HostsWarning,
@@ -192,17 +192,21 @@ public partial class NetworkAuditView : UserControl
             options.CleanHostsFile = hostsAnswer == MessageBoxResult.Yes;
         }
 
+        if (!options.SimulationMode)
+        {
         var answer = MessageBox.Show(
             NetworkAuditHints.BuildCleanupWarning(_items, fullClean),
             fullClean ? "Максимальная очистка" : "Подтверждение очистки",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
         if (answer != MessageBoxResult.Yes) return;
+        }
 
+        var snapshot = _items.ToArray();
         SetBusy(true);
         try
         {
-            var result = await Task.Run(() => _cleaner.Execute(_items, options, AppendLog));
+            var result = await Task.Run(() => _cleaner.Execute(snapshot, options, AppendLog));
             _lastOperation = ReportOperationType.Clean;
             _lastCleanResult = result;
             _lastOptions = options;
@@ -215,7 +219,12 @@ public partial class NetworkAuditView : UserControl
                 : string.Empty;
             var stats = $"Успешно: {result.Processed}, пропущено: {result.Skipped}, ошибок: {result.Failed}";
 
-            if (options.RebootAfterClean)
+            if (options.SimulationMode)
+            {
+                MessageBox.Show($"Проверка завершена без удаления.\nЗапланировано: {result.Processed}, пропущено: {result.Skipped}", "Симуляция");
+                return;
+            }
+            if (options.RebootAfterClean && result.Processed > 0 && result.Failed == 0)
             {
                 MessageBox.Show(
                     "Очистка выполнена.\n\n" +
@@ -229,12 +238,17 @@ public partial class NetworkAuditView : UserControl
             }
             else
             {
-                await RunScan();
+                await RunScan(preserveCleanResult: true);
                 MessageBox.Show(
                     stats + failDetails + skipDetails,
                     "Готово", MessageBoxButton.OK,
                     result.Failed > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
             }
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"ОШИБКА: {ex.Message}");
+            MessageBox.Show(ex.Message, "Не удалось завершить очистку", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
         {
@@ -268,15 +282,20 @@ public partial class NetworkAuditView : UserControl
         return true;
     }
 
-    private async Task RunScan()
+    private async Task RunScan(bool preserveCleanResult = false)
     {
         SetBusy(true);
         try
         {
             var options = BuildOptions();
             _lastOptions = options;
-            _lastOperation = ReportOperationType.Scan;
-            _lastCleanResult = null;
+            if (!preserveCleanResult)
+            {
+                _lastOperation = ReportOperationType.Scan;
+                _lastCleanResult = null;
+            }
+            if (options.DateFrom > options.DateTo)
+                throw new ArgumentException("Дата начала периода должна быть не позже даты окончания.");
             AppendLog($"--- Сканирование {options.DateFrom:dd.MM.yyyy} — {options.DateTo:dd.MM.yyyy} ---");
 
             var progress = new Progress<NetworkAuditProgress>(p =>
@@ -317,7 +336,7 @@ public partial class NetworkAuditView : UserControl
         foreach (var item in found)
         {
             item.MaskSecrets = !options.ShowSecrets;
-            item.Selected = options.FullCleanMode ? item.CanClean : item.CanClean;
+            item.Selected = false;
             _items.Add(item);
         }
         _view.Refresh();

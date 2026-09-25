@@ -145,8 +145,8 @@ public sealed class NetworkAuditOptions
 {
     public DateTime DateFrom { get; set; } = DateTime.Today.AddDays(-30);
     public DateTime DateTo { get; set; } = DateTime.Today.AddDays(1).AddSeconds(-1);
-    public bool ShowSecrets { get; set; } = true;
-    public bool SimulationMode { get; set; }
+    public bool ShowSecrets { get; set; } = false;
+    public bool SimulationMode { get; set; } = true;
     public string? RouterIp { get; set; }
     public string? RouterLogin { get; set; }
     public string? RouterPassword { get; set; }
@@ -159,11 +159,11 @@ public sealed class NetworkAuditOptions
     public bool ScanRegistry { get; set; } = true;
     public bool ScanCaches { get; set; } = true;
     public bool ScanUsbBluetooth { get; set; } = true;
-    public NetworkAuditWhitelist Whitelist { get; set; } = NetworkAuditWhitelist.DefaultExample();
+    public NetworkAuditWhitelist Whitelist { get; set; } = new();
     public bool FullCleanMode { get; set; }
     public bool CleanHostsFile { get; set; }
-    public bool DisconnectNetwork { get; set; } = true;
-    public bool RebootAfterClean { get; set; } = true;
+    public bool DisconnectNetwork { get; set; } = false;
+    public bool RebootAfterClean { get; set; } = false;
     public bool ShowUnknownOnly { get; set; }
 }
 

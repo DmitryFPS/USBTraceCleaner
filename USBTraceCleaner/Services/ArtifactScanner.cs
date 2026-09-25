@@ -103,6 +103,9 @@ public sealed class ArtifactScanner
 
     public List<ArtifactItem> Scan(CleanupOptions options, IProgress<CleanupProgress>? progress = null)
     {
+        if (!options.IncludeSharedArtifacts)
+            return ScanDeviceRecords(options, progress);
+
         var items = new ConcurrentBag<ArtifactItem>();
         var driveMask = RegistryHelper.GetConnectedDriveMask();
 
@@ -153,12 +156,35 @@ public sealed class ArtifactScanner
         }
 
         var result = items
-            .GroupBy(i => $"{i.Type}|{i.Location}|{i.ValueName}")
-            .Select(g => g.First())
+            .GroupBy(i => $"{i.Type}|{i.Location}|{i.ValueName}", StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.OrderByDescending(i => i.Category == ArtifactCategory.PnPGhosts).First())
             .OrderBy(i => i.Category)
             .ThenBy(i => i.Location)
             .ToList();
 
+        progress?.Report(new CleanupProgress { Phase = "Определение имён устройств…" });
+        WindowsDeviceInventory.Enrich(result);
+        progress?.Report(new CleanupProgress { Phase = "Готово", ItemsFound = result.Count });
+        return result;
+    }
+
+    private static List<ArtifactItem> ScanDeviceRecords(CleanupOptions options, IProgress<CleanupProgress>? progress)
+    {
+        progress?.Report(new CleanupProgress { Phase = "Чтение имён и записей устройств…" });
+        var inventory = WindowsDeviceInventory.Read();
+        var result = inventory.Where(d => d.InstanceId.StartsWith("USBSTOR\\", StringComparison.OrdinalIgnoreCase) ||
+            (d.InstanceId.StartsWith("USB\\", StringComparison.OrdinalIgnoreCase) &&
+                (UsbStorageServices.Contains(d.Service, StringComparer.OrdinalIgnoreCase) ||
+                (options.CleanMtpDevices && MtpServices.Contains(d.Service, StringComparer.OrdinalIgnoreCase)))))
+            .Select(d => new ArtifactItem
+            {
+                Category = ArtifactCategory.RegistrySystem,
+                Type = ArtifactType.RegistryKey,
+                Location = @"SYSTEM\CurrentControlSet\Enum\" + d.InstanceId,
+                Description = "Запись подключения устройства в Windows",
+                Selected = false
+            }).ToList();
+        WindowsDeviceInventory.Enrich(result, inventory);
         progress?.Report(new CleanupProgress { Phase = "Готово", ItemsFound = result.Count });
         return result;
     }

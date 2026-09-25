@@ -26,11 +26,11 @@ public static class NetworkAuditHints
         • Разрешено? — подключение из белого списка; такие элементы не удаляются при очистке
         • Тип — «Удалить» или «Просмотр» (роутер, адаптер, отдельные события)
 
-        МАКСИМАЛЬНАЯ ОЧИСТКА:
+        ОБРАБОТКА ВСЕХ НАЙДЕННЫХ ЗАПИСЕЙ:
         • Удаляет следы на ПК вне белого списка: профили, журналы, SRU, реестр, DNS, NetBIOS
         • Wi‑Fi/VPN/IP из белого списка сохраняются
         • hosts — только если вы подтвердите (Docker перестанет резолвиться)
-        • Отключает сеть и перезагружает ПК
+        • Отключение сети и перезагрузка выполняются только при включении соответствующих настроек
         """;
 
     public const string HostsWarning =
@@ -63,7 +63,7 @@ public static class NetworkAuditHints
         var dns = selected.Any(i => i.Kind == NetworkAuditKind.DnsCache && i.Location == "__flushdns__");
         var sru = selected.Any(i => i.Kind == NetworkAuditKind.SruDatabase);
 
-        var mode = fullClean ? "МАКСИМАЛЬНАЯ ОЧИСТКА" : "Выборочная очистка";
+        var mode = fullClean ? "ОБРАБОТКА ВСЕХ НАЙДЕННЫХ ЗАПИСЕЙ" : "Выборочная очистка";
 
         var toClean = selected.Count(i => i.AuthorizationStatus != NetworkAuthorizationStatus.Allowed);
 
@@ -79,7 +79,7 @@ public static class NetworkAuditHints
             (fullClean
                 ? "Элементы белого списка не удаляются.\n" +
                   "Закройте HAPP/VPN и Docker Desktop перед очисткой.\n" +
-                  "Wi‑Fi сессия будет разорвана (адаптер останется включённым). Windows перезагрузится.\n\n"
+                  "Отключение сети и перезагрузка зависят от выбранных настроек.\n\n"
                 : "Элементы белого списка не удаляются.\n\n") +
             "Продолжить?";
     }

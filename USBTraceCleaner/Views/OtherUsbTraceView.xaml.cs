@@ -65,7 +65,8 @@ public partial class OtherUsbTraceView : UserControl
 
     public async Task CleanSelectedAsync(Window owner)
     {
-        if (!AdminHelper.IsAdministrator())
+        var simulation = ChkOtherSimulation.IsChecked == true;
+        if (!simulation && !AdminHelper.IsAdministrator())
         {
             MessageBox.Show("Запустите программу от имени администратора.", "Нужны права",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -80,24 +81,29 @@ public partial class OtherUsbTraceView : UserControl
             return;
         }
 
+        if (!simulation)
+        {
         var answer = MessageBox.Show(
             $"Будет удалено следов устройств: {selected}\n\n" +
             "• Это не USB-флешки — хабы, камеры, виртуальные USB и архив DeviceMigration\n" +
-            "• USB-мышь/клавиатура могут кратковременно отключиться\n" +
+            "• Подключённые устройства защищены от удаления\n" +
+            "• На этой вкладке автоматическая резервная копия не создаётся\n" +
             "• После очистки нужна перезагрузка Windows\n\n" +
             "Продолжить?",
             "Очистить выбранное",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
         if (answer != MessageBoxResult.Yes) return;
+        }
 
+        var snapshot = _items.Where(i => i.Selected).ToArray();
         SetBusy(true);
         try
         {
             TxtOtherPhase.Text = "Удаление…";
             ProgressOther.IsIndeterminate = true;
 
-            var result = await Task.Run(() => OtherUsbTraceCleaner.Execute(_items, simulation: false, AppendLog));
+            var result = await Task.Run(() => OtherUsbTraceCleaner.Execute(snapshot, simulation));
             AppendLog(result.Log);
 
             if (!result.Success && !string.IsNullOrWhiteSpace(result.ErrorMessage))
@@ -106,9 +112,9 @@ public partial class OtherUsbTraceView : UserControl
                 return;
             }
 
-            await ScanAsync();
+            if (!simulation) await ScanAsync();
 
-            var msg = $"Обработано ключей: {result.Processed}\nОшибок: {result.Failed}\n\nПерезагрузите Windows.";
+            var msg = $"{(simulation ? "Проверка без удаления" : "Очистка")} завершена.\nОбработано ключей: {result.Processed}\nОшибок: {result.Failed}";
             if (result.Failed > 0 && result.FailedPaths.Count > 0)
             {
                 msg += "\n\nНе удалено (первые пути):\n";
@@ -125,6 +131,11 @@ public partial class OtherUsbTraceView : UserControl
                 "Готово",
                 MessageBoxButton.OK,
                 result.Failed > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"ОШИБКА: {ex.Message}");
+            MessageBox.Show(ex.Message, "Не удалось завершить очистку", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
         {

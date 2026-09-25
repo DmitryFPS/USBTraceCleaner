@@ -56,16 +56,22 @@ public sealed class NetworkAuditCleaner
         var skippedCount = 0;
 
         L($"Очистка сетевых следов: {selected.Count} элементов");
+        if (selected.Count == 0)
+            return new CleanResult { Log = sb.ToString() };
         if (options.SimulationMode)
         {
             L("Режим симуляции — удаление не выполнялось.");
-            return new CleanResult { Log = sb.ToString() };
-        }
-
-        if (options.FullCleanMode)
-        {
-            NetworkPostCleanActions.StopBlockingServices(L);
-            NetworkPostCleanActions.RunFullCleanExtras(options.Whitelist, L);
+            foreach (var item in selected)
+            {
+                if (item.AuthorizationStatus == NetworkAuthorizationStatus.Allowed ||
+                    (item.Kind == NetworkAuditKind.HostsFile && !options.CleanHostsFile))
+                {
+                    skippedCount++;
+                    L($"[SKIP] {item.Title}: защищено настройками");
+                }
+                else { processed++; L($"[SIM] {item.Title}"); }
+            }
+            return new CleanResult { Log = sb.ToString(), Processed = processed, Skipped = skippedCount };
         }
 
         foreach (var item in selected)
@@ -79,7 +85,8 @@ public sealed class NetworkAuditCleaner
 
             if (item.Kind == NetworkAuditKind.HostsFile && !options.CleanHostsFile)
             {
-                L($"  — Пропуск hosts (не подтверждено): {item.Title}");
+                skippedCount++;
+                Skip(item.Title, "изменение hosts не подтверждено");
                 continue;
             }
 
@@ -108,24 +115,12 @@ public sealed class NetworkAuditCleaner
             }
         }
 
-        if (options.FullCleanMode)
-            NetworkPostCleanActions.StartBlockingServices(L);
-
-        if (options.DisconnectNetwork)
+        if (options.DisconnectNetwork && processed > 0 && failed == 0)
             NetworkPostCleanActions.DisconnectNetwork(options.RebootAfterClean, L);
 
         L($"Готово. Успешно: {processed}, пропущено: {skippedCount}, ошибок: {failed}");
 
-        if (options.FullCleanMode)
-        {
-            var verify = NetworkAuditVerifier.Verify();
-            L("--- Самопроверка ---");
-            L(verify.Summary);
-            foreach (var issue in verify.RemainingIssues)
-                L($"  ⚠ {issue}");
-        }
-
-        if (options.RebootAfterClean)
+        if (options.RebootAfterClean && processed > 0 && failed == 0)
         {
             NetworkPostCleanActions.ScheduleReboot(60, L);
             L("  ℹ После перезагрузки можно сохранить «Отчёт PDF» без Wi‑Fi, затем включить сеть.");
@@ -173,17 +168,17 @@ public sealed class NetworkAuditCleaner
                 return CleanOutcome.Success;
 
             case NetworkAuditKind.WiFiProfile:
-                ProcessRunner.Run("netsh", $"wlan delete profile name=\"{item.Location}\"");
+                ProcessRunner.RunChecked("netsh", ["wlan", "delete", "profile", $"name={item.Location}"]);
                 log($"  ✓ Удалён профиль Wi‑Fi: {item.Location}");
                 return CleanOutcome.Success;
 
             case NetworkAuditKind.DnsCache when item.Location == "__flushdns__":
-                ProcessRunner.Run("ipconfig", "/flushdns");
+                ProcessRunner.RunChecked("ipconfig", ["/flushdns"]);
                 log("  ✓ DNS-кэш очищен");
                 return CleanOutcome.Success;
 
             case NetworkAuditKind.DnsCache:
-                return CleanOutcome.Success;
+                return CleanOutcome.Skipped("отдельные строки DNS не удаляются; выберите очистку всего кэша");
 
             case NetworkAuditKind.EventLogChannel:
                 switch (ProcessRunner.TryClearEventLog(item.Location, out var evtErr))
@@ -205,16 +200,17 @@ public sealed class NetworkAuditCleaner
                 return CleanOutcome.Success;
 
             case NetworkAuditKind.RegistryTrace:
-                TryDeleteRegistryKey(RegistryHive.LocalMachine,
+                var unmanaged = TryDeleteRegistryKey(RegistryHive.LocalMachine,
                     $@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Signatures\Unmanaged\{item.Location}");
-                TryDeleteRegistryKey(RegistryHive.LocalMachine,
+                var managed = TryDeleteRegistryKey(RegistryHive.LocalMachine,
                     $@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Signatures\Managed\{item.Location}");
+                if (!unmanaged || !managed) return CleanOutcome.Failed("подпись сети недоступна для удаления");
                 log($"  ✓ Удалена подпись сети/VPN: {item.Location}");
                 return CleanOutcome.Success;
 
             case NetworkAuditKind.NlaCache:
-                TryDeleteRegistryKey(RegistryHive.LocalMachine,
-                    $@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Nla\Cache\{item.Location}");
+                if (!TryDeleteRegistryKey(RegistryHive.LocalMachine,
+                    $@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Nla\Cache\{item.Location}")) return CleanOutcome.Failed("Не удалось удалить NLA-запись");
                 log($"  ✓ Удалён NLA cache: {item.Location}");
                 return CleanOutcome.Success;
 
@@ -230,7 +226,7 @@ public sealed class NetworkAuditCleaner
                 return CleanOutcome.Success;
 
             case NetworkAuditKind.NetbiosCache:
-                ProcessRunner.Run("nbtstat", "-R");
+                ProcessRunner.RunChecked("nbtstat", ["-R"]);
                 log("  ✓ NetBIOS кэш сброшен");
                 return CleanOutcome.Success;
 
@@ -244,8 +240,8 @@ public sealed class NetworkAuditCleaner
                 return ok ? CleanOutcome.Success : CleanOutcome.Failed(err ?? "hosts");
 
             case NetworkAuditKind.WlanRegistry:
-                TryDeleteRegistryKey(RegistryHive.LocalMachine,
-                    $@"SYSTEM\CurrentControlSet\Services\WlanSvc\Interfaces\{item.Location}");
+                if (!TryDeleteRegistryKey(RegistryHive.LocalMachine,
+                    $@"SYSTEM\CurrentControlSet\Services\WlanSvc\Interfaces\{item.Location}")) return CleanOutcome.Failed("Не удалось удалить WLAN-запись");
                 log($"  ✓ Удалён WLAN интерфейс в реестре: {item.Location}");
                 return CleanOutcome.Success;
 

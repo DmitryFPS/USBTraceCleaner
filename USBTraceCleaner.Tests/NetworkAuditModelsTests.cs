@@ -10,7 +10,7 @@ public class NetworkAuditModelsTests
         var wl = NetworkAuditWhitelist.Parse("20.0.0.1, 20.0.0.2;20.0.0.3", "net1;net2", "vpn1");
         Assert.Equal(3, wl.AllowedIps.Count);
         Assert.Equal(2, wl.AllowedWiFi.Count);
-        Assert.Equal(1, wl.AllowedVpn.Count);
+        Assert.Single(wl.AllowedVpn);
     }
 
     [Fact]

@@ -62,11 +62,26 @@ public sealed class OtherUsbTraceScanner
         ScanSetupUpgradeResidual(log);
 
         log?.Invoke($"Итого устройств: {_byKey.Count}");
-        return _byKey.Values
+        var result = _byKey.Values
             .Select(m => m.ToItem())
             .OrderBy(i => i.Vid)
             .ThenBy(i => i.Pid)
             .ToList();
+        var resolver = new DeviceIdentityResolver(WindowsDeviceInventory.Read());
+        foreach (var item in result)
+        {
+            var artifact = new ArtifactItem
+            {
+                Type = ArtifactType.RegistryKey, Category = ArtifactCategory.RegistrySystem,
+                Location = item.DisplayLocation, Detail = $"VID_{item.Vid}&PID_{item.Pid}"
+            };
+            resolver.Enrich(artifact);
+            item.DeviceName = artifact.DeviceName;
+            item.DeviceNameSource = artifact.DeviceNameSource;
+            item.DevicePresent = artifact.DevicePresent;
+            item.RelatedDeviceIds = artifact.RelatedDeviceIds;
+        }
+        return result;
     }
 
     /// <summary>usbflags — кэш USB-дескрипторов, главный источник «остаточных следов».</summary>
@@ -315,9 +330,8 @@ public sealed class OtherUsbTraceScanner
 
         public OtherUsbTraceItem ToItem()
         {
-            var paths = OtherUsbPathCollector.CollectRegistryPaths(Vid, Pid);
-            var logs = OtherUsbPathCollector.CollectSetupApiLogs(Vid, Pid);
-            foreach (var p in _paths) paths.Add(p);
+            var paths = _paths.ToList();
+            var logs = new List<string>();
 
             var source = _sources.OrderBy(s => s).First();
             var manufacturer = Manufacturer;

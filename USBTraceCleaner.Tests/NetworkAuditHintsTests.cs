@@ -48,9 +48,9 @@ public class NetworkAuditHintsTests
         };
 
         var text = NetworkAuditHints.BuildCleanupWarning(items, fullClean: true);
-        Assert.Contains("МАКСИМАЛЬНАЯ ОЧИСТКА", text);
+        Assert.Contains("ОБРАБОТКА ВСЕХ НАЙДЕННЫХ ЗАПИСЕЙ", text);
         Assert.Contains("DNS-кэш: да", text);
-        Assert.Contains("перезагрузится", text);
+        Assert.Contains("зависят от выбранных настроек", text);
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public class NetworkAuditHintsTests
     [Fact]
     public void AppInfo_VersionMatchesProject()
     {
-        Assert.Equal("1.7.1", AppInfo.Version);
-        Assert.Equal("v1.7.1", AppInfo.VersionLabel);
+        Assert.Equal("1.8.0", AppInfo.Version);
+        Assert.Equal("v1.8.0", AppInfo.VersionLabel);
     }
 }

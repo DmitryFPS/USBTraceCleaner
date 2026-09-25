@@ -19,15 +19,16 @@
 
             <StackPanel Grid.Row="0" Margin="0,0,0,12">
                 <TextBlock Text="Другие USB-следы" Style="{StaticResource PageTitle}"/>
-                <TextBlock Text="usbflags, DeviceMigration, Setup\Upgrade — остаточные следы как нижняя таблица USBDetector (не флешки, не активные устройства)"
+                <TextBlock Text="Дополнительные записи о моделях USB. Здесь могут быть записи о подключённых устройствах."
                            Style="{StaticResource PageSubtitle}"/>
             </StackPanel>
 
             <Border Grid.Row="1" Style="{StaticResource MainCard}" Margin="0,0,0,12">
-                <TextBlock Margin="12" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12">
-                    Отметьте устройства и нажмите «Очистить выбранное». Флешки и USBSTOR не затрагиваются.
-                    После очистки перезагрузите Windows. Активные устройства могут появиться в списке снова.
-                </TextBlock>
+                <StackPanel Margin="12">
+                    <CheckBox x:Name="ChkOtherSimulation" Content="Проверка без удаления" IsChecked="True" Margin="0,0,0,8"/>
+                    <TextBlock TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"
+                        Text="Дополнительный раздел для опытных пользователей. Выбирайте только знакомые записи. Общие журналы не изменяются; резервная копия на этой вкладке не создаётся."/>
+                </StackPanel>
             </Border>
 
             <Border x:Name="OtherResultsHost" Grid.Row="2" Style="{StaticResource MainCard}" MinHeight="180">
@@ -55,11 +56,13 @@
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <CheckBox Style="{StaticResource GridCheckBox}"
-                                                  IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}"
+                                                  IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanSelect}"
                                                   Click="TraceCheck_Click"/>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Устройство" Binding="{Binding DeviceName}" IsReadOnly="True" Width="230"/>
+                            <DataGridTextColumn Header="Состояние" Binding="{Binding DisplayConnection}" IsReadOnly="True" Width="170"/>
                             <DataGridTextColumn Header="VID" Binding="{Binding DisplayVid}" IsReadOnly="True" Width="64" MinWidth="56">
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>

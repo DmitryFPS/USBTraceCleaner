@@ -20,7 +20,7 @@
 
             <StackPanel Grid.Row="0" Margin="0,0,0,12">
                 <TextBlock Text="Аудит сети" Style="{StaticResource PageTitle}"/>
-                <TextBlock Text="Проверка подключений и максимальная очистка следов на ПК"
+                <TextBlock Text="Просмотр сетевых записей. «Неизвестно» означает отсутствие в вашем белом списке, а не угрозу."
                            Style="{StaticResource PageSubtitle}"/>
             </StackPanel>
 
@@ -31,15 +31,15 @@
                         <TextBlock Text="IP:" VerticalAlignment="Center" Margin="0,0,6,8"
                                    Foreground="{StaticResource TextSecondaryBrush}"/>
                         <TextBox x:Name="TxtAllowedIps" Width="220" Margin="0,0,14,8" Padding="6,4"
-                                 Text="20.0.0.116, 20.20.20.76"/>
+                                 Text=""/>
                         <TextBlock Text="Wi‑Fi:" VerticalAlignment="Center" Margin="0,0,6,8"
                                    Foreground="{StaticResource TextSecondaryBrush}"/>
                         <TextBox x:Name="TxtAllowedWiFi" Width="100" Margin="0,0,14,8" Padding="6,4"
-                                 Text="doZOR"/>
+                                 Text=""/>
                         <TextBlock Text="VPN:" VerticalAlignment="Center" Margin="0,0,6,8"
                                    Foreground="{StaticResource TextSecondaryBrush}"/>
                         <TextBox x:Name="TxtAllowedVpn" Width="160" Margin="0,0,0,8" Padding="6,4"
-                                 Text="HAPP, happ, happ-tun"/>
+                                 Text=""/>
                     </WrapPanel>
                     <CheckBox x:Name="ChkShowUnknownOnly" Style="{StaticResource CompactCheckBox}"
                               Content="Показать только неизвестные (не из белого списка)" Margin="0,0,0,0"/>
@@ -57,16 +57,16 @@
                                    Foreground="{StaticResource TextSecondaryBrush}"/>
                         <DatePicker x:Name="DpTo" Width="128" Margin="0,0,14,8"/>
                         <CheckBox x:Name="ChkShowSecrets" Style="{StaticResource CompactCheckBox}"
-                                  Content="Показать пароли Wi‑Fi" IsChecked="True" Margin="0,0,14,8"/>
+                                  Content="Показать пароли Wi‑Fi" IsChecked="False" Margin="0,0,14,8"/>
                         <CheckBox x:Name="ChkSimulation" Style="{StaticResource CompactCheckBox}"
-                                  Content="Симуляция (без удаления)" IsChecked="False" Margin="0,0,14,8"
+                                  Content="Симуляция (без удаления)" IsChecked="True" Margin="0,0,14,8"
                                   ToolTip="Прогон очистки сети без удаления профилей и журналов"/>
                         <CheckBox x:Name="ChkFullClean" Style="{StaticResource CompactCheckBox}"
-                                  Content="Максимальная очистка" IsChecked="True" Margin="0,0,14,8"/>
+                                  Content="Все найденные записи" IsChecked="False" Margin="0,0,14,8"/>
                         <CheckBox x:Name="ChkDisconnect" Style="{StaticResource CompactCheckBox}"
-                                  Content="Отключить сеть после" IsChecked="True" Margin="0,0,14,8"/>
+                                  Content="Отключить сеть после" IsChecked="False" Margin="0,0,14,8"/>
                         <CheckBox x:Name="ChkReboot" Style="{StaticResource CompactCheckBox}"
-                                  Content="Перезагрузка после" IsChecked="True" Margin="0,0,0,8"/>
+                                  Content="Перезагрузка после" IsChecked="False" Margin="0,0,0,8"/>
                     </WrapPanel>
                     <WrapPanel Margin="0,0,0,8">
                         <TextBlock Text="Роутер IP:" VerticalAlignment="Center" Margin="0,0,6,8"

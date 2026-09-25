@@ -22,6 +22,18 @@ internal static class ProcessRunner
         return NetworkAuditDisplay.SanitizeForDisplay(output);
     }
 
+    public static void RunChecked(string fileName, IEnumerable<string> arguments)
+    {
+        EnsureSuccess(ProcessExec.Run(fileName, arguments, 60_000, GetConsoleEncoding()));
+    }
+
+    internal static void EnsureSuccess(ProcessExec.Result result)
+    {
+        if (!result.Ok)
+            throw new InvalidOperationException(result.TimedOut ? "Команда не завершилась вовремя." :
+                $"Ошибка команды ({result.ExitCode}): {NetworkAuditDisplay.SanitizeForDisplay(result.Combined)}");
+    }
+
     public enum EventLogClearResult
     {
         Success,

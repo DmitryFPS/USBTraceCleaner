@@ -35,8 +35,6 @@ public partial class MainWindow : Window
     private ReportOperationType _lastUsbOperation = ReportOperationType.Scan;
     private CleanupResult? _lastUsbCleanResult;
     private CleanupOptions? _lastUsbOptions;
-    private int _lastGhostRemoved;
-    private int _lastGhostFailed;
 
     public MainWindow()
     {
@@ -72,8 +70,9 @@ public partial class MainWindow : Window
         AppendLog("Перед очисткой отключите все USB-накопители.");
         AppendLog("Слева — категории; «Призраки / дубликаты» — лишние записи PnP.");
         AppendLog("«Сканировать» — показать следы. «Очистить» — удалить выбранное.");
-        AppendLog("«Удалить призраки» — быстро найти и удалить дубликаты PnP.");
+        AppendLog("«Найти старые записи» — показать отключённые устройства без удаления.");
         AppendLog("");
+        UpdateCount();
     }
 
     private void InitCategories() => RebuildUsbCategories(preserveSelection: false);
@@ -135,7 +134,9 @@ public partial class MainWindow : Window
 
     private async Task RunOperation(bool scanOnly)
     {
+        if (_operationInProgress) return;
         SetBusy(true);
+        ProgressBar.IsIndeterminate = true;
         _cts = new CancellationTokenSource();
 
         try
@@ -214,6 +215,7 @@ public partial class MainWindow : Window
             _cts?.Dispose();
             _cts = null;
             SetBusy(false);
+            ProgressBar.IsIndeterminate = false;
             ProgressBar.Value = 0;
         }
     }
@@ -232,6 +234,7 @@ public partial class MainWindow : Window
     {
         return new CleanupOptions
         {
+            IncludeSharedArtifacts = ChkAdvancedScan.IsChecked == true,
             SimulationMode = ChkSimulation.IsChecked == true,
             SaveBackup = ChkBackup.IsChecked == true,
             CreateRestorePoint = ChkRestorePoint.IsChecked == true,
@@ -263,10 +266,12 @@ public partial class MainWindow : Window
         if (obj is not ArtifactItem item) return false;
         if (!_isReady) return true;
 
-        if (_activeGroup == ArtifactViewGroup.All)
-            return true;
-
-        return item.ViewGroup == _activeGroup;
+        if (_activeGroup != ArtifactViewGroup.All && item.ViewGroup != _activeGroup) return false;
+        if (ChkDisconnectedOnly.IsChecked == true && item.DevicePresent != false) return false;
+        var query = TxtDeviceSearch.Text.Trim();
+        return query.Length == 0 || new[] { item.DeviceName, item.Location, item.ValueName,
+            item.Description, item.DisplayVid, item.DisplayPid, item.Detail }
+            .Any(value => value?.Contains(query, StringComparison.OrdinalIgnoreCase) == true);
     }
 
     private void LstCategories_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -313,7 +318,7 @@ public partial class MainWindow : Window
                 ? "USB не-накопители: как «Другие следы» в USBDetector"
                 : _isEventLogsTab
                     ? "Просмотр и очистка журналов Windows (Event Viewer)"
-                    : "Профессиональная очистка следов USB";
+                    : "Найдите старые подключения и выберите, что убрать";
         RefreshSidebarCategories();
 
         if (_isEventLogsTab && EventLogsView.ChannelCount == 0)
@@ -406,7 +411,7 @@ public partial class MainWindow : Window
     private void BtnSelectAll_Click(object sender, RoutedEventArgs e)
     {
         foreach (var item in _filteredView.Cast<ArtifactItem>())
-            item.Selected = true;
+            item.Selected = item.CanSelect;
         GridArtifacts.Items.Refresh();
         UpdateCount();
     }
@@ -438,7 +443,7 @@ public partial class MainWindow : Window
         if (_activeGroup == ArtifactViewGroup.All)
         {
             TxtFoundCount.Text =
-                $"Показано: {visible.Count} из {_allItems.Count} | USB-накопителей: {storage} | Выбрано: {selectedAll}";
+                $"Показано: {visible.Count} из {_allItems.Count} | Записей накопителей: {storage} | Выбрано: {selectedAll}";
         }
         else
         {
@@ -446,74 +451,49 @@ public partial class MainWindow : Window
                 $"В разделе: {visible.Count} | Выбрано в разделе: {selectedVisible} | Всего выбрано: {selectedAll}";
         }
 
-        DataGridScrollHelper.SizeLastColumnToContent(GridArtifacts);
+        BtnClean.Content = ChkSimulation.IsChecked == true ? "Проверить выбранное" : "Удалить выбранное";
+        BtnClean.IsEnabled = !_operationInProgress && selectedAll > 0;
+        TxtUsbHint.Text = _allItems.Count == 0
+            ? "Нажмите «Найти устройства». Сканирование ничего не удаляет."
+            : selectedAll == 0 ? "Выберите знакомые отключённые устройства. Нажмите на строку, чтобы увидеть подробности."
+            : $"Выбрано записей: {selectedAll}. Из них скрыто фильтром: {selectedAll - selectedVisible}.";
     }
 
     private async void BtnFixDuplicates_Click(object sender, RoutedEventArgs e)
     {
-        if (!AdminHelper.IsAdministrator())
-        {
-            MessageBox.Show("Запустите программу от имени администратора.", "Нужны права",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-
+        if (_operationInProgress) return;
         SetBusy(true);
         try
         {
-            AppendLog("--- Поиск призраков и дубликатов PnP ---");
-            var ghosts = await Task.Run(() => PnPGhostScanner.Scan());
-            AppendLog($"Найдено: {ghosts.Count}");
-
+            var ghosts = await Task.Run(() =>
+            {
+                var found = PnPGhostScanner.Scan();
+                WindowsDeviceInventory.Enrich(found);
+                return found;
+            });
             MergeGhostScanResults(ghosts);
             SelectCategory(ArtifactViewGroup.PnPGhosts);
-
-            if (ghosts.Count == 0)
-            {
-                MessageBox.Show("Призраки и дубликаты PnP не найдены.", "Готово",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            var answer = MessageBox.Show(
-                $"Найдено записей: {ghosts.Count}\n\n" +
-                "• Дубликаты — лишние instance ID одного устройства\n" +
-                "• Призраки — запись в реестре без активного устройства\n\n" +
-                "Удалить все найденные записи?",
-                "Призраки / дубликаты PnP",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (answer != MessageBoxResult.Yes)
-            {
-                AppendLog("Удаление отменено — записи показаны в таблице (категория «Призраки / дубликаты»).");
-                return;
-            }
-
-            AppendLog("--- Удаление призраков и дубликатов ---");
-            var result = await Task.Run(() => PnPGhostScanner.RemoveSelected(_allItems, AppendLog));
-            MergeGhostScanResults(PnPGhostScanner.Scan());
-            _lastUsbOperation = ReportOperationType.GhostClean;
-            _lastGhostRemoved = result.Removed;
-            _lastGhostFailed = result.Failed;
-            _lastUsbCleanResult = new CleanupResult
-            {
-                ItemsProcessed = result.Removed,
-                FailedCount = result.Failed,
-                Success = result.Failed == 0
-            };
-            AppendLog($"Удалено: {result.Removed}, ошибок: {result.Failed}");
-
-            MessageBox.Show(
-                $"Удалено: {result.Removed}\nОшибок: {result.Failed}\n\nПерезагрузите Windows.",
-                "Готово",
-                MessageBoxButton.OK,
-                result.Failed > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
+            TxtPhase.Text = $"Найдено отключённых записей: {ghosts.Count}. Выберите нужные в таблице.";
         }
-        finally
+        catch (Exception ex)
         {
-            SetBusy(false);
+            AppendLog($"Ошибка поиска отключённых устройств: {ex.Message}");
+            MessageBox.Show(ex.Message, "Не удалось завершить поиск", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+        finally { SetBusy(false); }
+    }
+
+    private void UsbFilterChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_isReady) return;
+        _filteredView.Refresh();
+        UpdateCount();
+    }
+
+    private void UsbModeChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_isReady) return;
+        UpdateCount();
     }
 
     private void MergeGhostScanResults(IReadOnlyList<ArtifactItem> ghosts)
@@ -672,13 +652,15 @@ public partial class MainWindow : Window
     {
         _operationInProgress = busy;
         Mouse.OverrideCursor = busy ? Cursors.Wait : null;
+        MainTabs.IsEnabled = !busy;
+        LstCategories.IsEnabled = !busy;
     }
 
     private void SetBusy(bool busy)
     {
         SetOperationChrome(busy);
         BtnScan.IsEnabled = !busy;
-        BtnClean.IsEnabled = !busy;
+        BtnClean.IsEnabled = !busy && _allItems.Any(i => i.Selected);
         BtnFixDuplicates.IsEnabled = !busy;
         BtnSelectAll.IsEnabled = !busy;
         BtnDeselectAll.IsEnabled = !busy;

@@ -121,7 +121,8 @@ public sealed class ArtifactCleaner
             }
 
             if (!simulation && item.Type is ArtifactType.RegistryKey or ArtifactType.RegistryValue
-                && DeviceRegistryGuard.ContainsPresentDevice(item.Location))
+                && (item.RelatedDeviceIds.Any(DeviceUninstallHelper.IsDevicePresent)
+                    || DeviceRegistryGuard.ContainsPresentDevice(item.Location)))
             {
                 _failCount++;
                 Log($"[FAIL] Подключённое устройство защищено: {item.Location}");

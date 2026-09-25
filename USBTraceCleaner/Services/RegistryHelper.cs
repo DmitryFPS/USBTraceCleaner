@@ -66,7 +66,7 @@ public static class RegistryHelper
     {
         try
         {
-            var baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
+            using var baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
             using var key = baseKey.OpenSubKey(subKey, writable);
             if (key != null) action(key);
         }
@@ -78,7 +78,7 @@ public static class RegistryHelper
     {
         try
         {
-            var baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
+            using var baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
             using var key = baseKey.OpenSubKey(subKey);
             return key != null;
         }
@@ -92,7 +92,7 @@ public static class RegistryHelper
     {
         try
         {
-            var baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
+            using var baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
             using var key = baseKey.OpenSubKey(subKey);
             return key?.GetValue(valueName)?.ToString();
         }
@@ -272,7 +272,7 @@ public static class RegistryHelper
     {
         try
         {
-            var baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
+            using var baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
             using var key = baseKey.OpenSubKey(subKey);
             return key?.SubKeyCount > 0;
         }
@@ -314,7 +314,7 @@ public static class RegistryHelper
 
         try
         {
-            var baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
+            using var baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
             using var key = baseKey.OpenSubKey(subKey, writable: true);
             if (key?.GetValue(valueName) != null)
                 key.DeleteValue(valueName, throwOnMissingValue: false);
@@ -342,7 +342,7 @@ public static class RegistryHelper
         string[] children;
         try
         {
-            var baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
+            using var baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
             using var key = baseKey.OpenSubKey(subKey);
             if (key == null) return 0;
             children = key.GetSubKeyNames();
@@ -481,7 +481,7 @@ public static class RegistryHelper
     {
         try
         {
-            var baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
+            using var baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
             using var key = baseKey.OpenSubKey(subKey);
             return key?.SubKeyCount ?? 0;
         }
@@ -492,7 +492,7 @@ public static class RegistryHelper
     {
         try
         {
-            var baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
+            using var baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
             using var key = baseKey.OpenSubKey(subKey);
             return key?.GetValue(valueName) != null;
         }

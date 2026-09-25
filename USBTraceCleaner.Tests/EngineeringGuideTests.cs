@@ -57,7 +57,7 @@ public class EngineeringGuideTests
     {
         var readme = Path.Combine(FindRepoRoot(), "README.md");
         var text = File.ReadAllText(readme);
-        Assert.Contains("**Версия:** 1.7.1", text);
+        Assert.Contains("**Версия:** 1.8.0", text);
         Assert.Contains("build-exe.ps1", text);
         Assert.Contains("Инженерное руководство", text);
         Assert.Contains("не удаляются", text);

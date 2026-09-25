@@ -6,12 +6,12 @@
         Height="800" Width="1180"
         MinHeight="640" MinWidth="960"
         WindowStartupLocation="CenterScreen"
-        Icon="pack://application:,,,/Assets/app.ico"
+        Icon="pack://application:,,,/USBTraceCleaner;component/Assets/app.ico"
         Background="{StaticResource BgBrush}"
         FontFamily="Segoe UI">
-    <Grid>
+    <Grid Background="{StaticResource BgBrush}">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="260"/>
+            <ColumnDefinition Width="220"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
@@ -21,12 +21,12 @@
                 <StackPanel DockPanel.Dock="Top" Margin="0,4,0,20">
                     <Border Background="#1D4ED8" CornerRadius="6" Padding="8,3"
                             HorizontalAlignment="Left" Margin="0,0,0,10">
-                        <TextBlock Text="PRO" Foreground="White" FontSize="10" FontWeight="Bold"/>
+                        <TextBlock Text="USB / TYPE-C" Foreground="White" FontSize="10" FontWeight="Bold"/>
                     </Border>
                     <TextBlock Text="USB Trace Cleaner" Foreground="White"
                                FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap"/>
                     <TextBlock x:Name="TxtSubtitle"
-                               Text="Профессиональная очистка следов USB"
+                               Text="Найдите старые подключения и выберите, что убрать"
                                Foreground="#94A3B8" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap"/>
                     <TextBlock x:Name="TxtAdminWarning" Foreground="#FCA5A5"
                                FontWeight="SemiBold" FontSize="11" Margin="0,10,0,0"
@@ -95,64 +95,49 @@
                             </Grid.RowDefinitions>
 
                             <StackPanel Grid.Row="0" Margin="0,0,0,12">
-                                <TextBlock Text="Очистка следов USB" Style="{StaticResource PageTitle}"/>
-                                <TextBlock Text="Сканирование, выборочная очистка и удаление призрачных PnP-записей"
+                                <TextBlock Text="Ваши USB-устройства" Style="{StaticResource PageTitle}"/>
+                                <TextBlock Text="1. Найдите устройства   →   2. Выберите ненужные записи   →   3. Проверьте без удаления"
                                            Style="{StaticResource PageSubtitle}"/>
                             </StackPanel>
 
                             <Border Grid.Row="1" Style="{StaticResource MainCard}" Margin="0,0,0,12">
-                                <UniformGrid Columns="3" Margin="12">
-                                    <Border Style="{StaticResource OptionCard}" Margin="0,0,6,0">
-                                        <StackPanel>
-                                            <TextBlock Text="БЭКАП" Style="{StaticResource SectionHeader}"/>
-                                            <CheckBox x:Name="ChkSimulation" Style="{StaticResource CompactCheckBox}"
-                                                      Content="Симуляция (без удаления)" IsChecked="True"
-                                                      ToolTip="Прогон очистки без изменений реестра, файлов и журналов"/>
-                                            <CheckBox x:Name="ChkBackup" Style="{StaticResource CompactCheckBox}"
-                                                      Content="Сохранить .reg-бэкап" IsChecked="True"/>
-                                            <CheckBox x:Name="ChkRestorePoint" Style="{StaticResource CompactCheckBox}"
-                                                      Content="Точка восстановления" IsChecked="False"/>
-                                        </StackPanel>
-                                    </Border>
-                                    <Border Style="{StaticResource OptionCard}" Margin="3,0">
-                                        <StackPanel>
-                                            <TextBlock Text="ПРИ ОЧИСТКЕ" Style="{StaticResource SectionHeader}"/>
-                                            <CheckBox x:Name="ChkCloseExplorer" Style="{StaticResource CompactCheckBox}"
-                                                      Content="Закрыть Проводник" IsChecked="True"/>
-                                            <CheckBox x:Name="ChkReboot" Style="{StaticResource CompactCheckBox}"
-                                                      Content="Перезагрузить Windows" IsChecked="False"/>
-                                            <CheckBox x:Name="ChkMtp" Style="{StaticResource CompactCheckBox}"
-                                                      Content="Очищать MTP (телефоны)" IsChecked="True"/>
-                                        </StackPanel>
-                                    </Border>
-                                    <Border Style="{StaticResource OptionCard}" Margin="6,0,0,0">
-                                        <StackPanel>
-                                            <TextBlock Text="ЛОГИ И FORENSIC" Style="{StaticResource SectionHeader}"/>
-                                            <CheckBox x:Name="ChkScrubLogs" Style="{StaticResource CompactCheckBox}"
-                                                      Content="Чистить логи (кроме setupapi.dev.log)" IsChecked="True"/>
-                                            <CheckBox x:Name="ChkPreserveLogDates" Style="{StaticResource CompactCheckBox}"
-                                                      Content="Сохранять даты логов" IsChecked="True"/>
-                                            <CheckBox x:Name="ChkShellBags" Style="{StaticResource CompactCheckBox}"
-                                                      Content="ShellBags" IsChecked="True"/>
-                                            <CheckBox x:Name="ChkRecentLinks" Style="{StaticResource CompactCheckBox}"
-                                                      Content="Recent / Jump Lists" IsChecked="True"/>
-                                            <CheckBox x:Name="ChkBam" Style="{StaticResource CompactCheckBox}"
-                                                      Content="BAM/DAM" IsChecked="True"/>
-                                            <CheckBox x:Name="ChkExecution" Style="{StaticResource CompactCheckBox}"
-                                                      Content="Prefetch / Amcache / Shimcache" IsChecked="True"/>
-                                            <CheckBox x:Name="ChkExplorerMru" Style="{StaticResource CompactCheckBox}"
-                                                      Content="RecentDocs / TypedPaths / MRU" IsChecked="True"/>
-                                            <CheckBox x:Name="ChkRecycle" Style="{StaticResource CompactCheckBox}"
-                                                      Content="Recycle Bin (USB)" IsChecked="True"/>
-                                            <CheckBox x:Name="ChkVss" Style="{StaticResource CompactCheckBox}"
-                                                      Content="VSS недоступны при выборочной очистке" IsChecked="False" IsEnabled="False"/>
-                                            <CheckBox x:Name="ChkSelfTraces" Style="{StaticResource CompactCheckBox}"
-                                                      Content="Self-trace утилит очистки" IsChecked="True"/>
-                                            <CheckBox x:Name="ChkSystemLog" Style="{StaticResource CompactCheckBox}"
-                                                      Content="Журнал System (UserPnp/104)" IsChecked="True"/>
-                                        </StackPanel>
-                                    </Border>
-                                </UniformGrid>
+                                <StackPanel Margin="12">
+                                    <WrapPanel>
+                                        <CheckBox x:Name="ChkSimulation" Style="{StaticResource CompactCheckBox}"
+                                            Content="Проверка без удаления" IsChecked="True" Margin="0,0,20,6"
+                                            Checked="UsbModeChanged" Unchecked="UsbModeChanged"
+                                            ToolTip="Показывает план действий. Чтобы удалить записи, снимите эту галочку."/>
+                                        <CheckBox x:Name="ChkBackup" Style="{StaticResource CompactCheckBox}"
+                                            Content="Сохранить резервную копию реестра" IsChecked="True"/>
+                                    </WrapPanel>
+                                    <TextBlock x:Name="TxtUsbHint" TextWrapping="Wrap" Foreground="#475569" Margin="0,2,0,8"/>
+                                    <Expander Header="Дополнительные настройки — для опытных пользователей">
+                                        <ScrollViewer MaxHeight="190" VerticalScrollBarVisibility="Auto">
+                                            <StackPanel Margin="0,10,0,0">
+                                                <CheckBox x:Name="ChkAdvancedScan" Style="{StaticResource CompactCheckBox}"
+                                                    Content="Расширенный поиск: общие журналы, история и дополнительные ветви реестра" IsChecked="False"/>
+                                                <TextBlock Text="Изменили настройки поиска? Выполните сканирование заново. Общие записи могут относиться сразу к нескольким устройствам."
+                                                    TextWrapping="Wrap" Foreground="#92400E" Margin="0,0,0,8"/>
+                                                <UniformGrid Columns="2">
+<CheckBox x:Name="ChkCloseExplorer" Style="{StaticResource CompactCheckBox}" Content="Закрывать Проводник при удалении" IsChecked="False"/>
+<CheckBox x:Name="ChkReboot" Style="{StaticResource CompactCheckBox}" Content="Перезагрузить ПК после успешного удаления" IsChecked="False"/>
+<CheckBox x:Name="ChkMtp" Style="{StaticResource CompactCheckBox}" Content="Искать телефоны и камеры (MTP)" IsChecked="True"/>
+<CheckBox x:Name="ChkRestorePoint" Style="{StaticResource CompactCheckBox}" Content="Создать точку восстановления Windows" IsChecked="False"/>
+<CheckBox x:Name="ChkScrubLogs" Style="{StaticResource CompactCheckBox}" Content="Обрабатывать содержимое выбранных логов" IsChecked="True"/>
+<CheckBox x:Name="ChkPreserveLogDates" Style="{StaticResource CompactCheckBox}" Content="Сохранять даты выбранных логов" IsChecked="True"/>
+<CheckBox x:Name="ChkShellBags" Style="{StaticResource CompactCheckBox}" Content="История вида папок (ShellBags)" IsChecked="False"/>
+<CheckBox x:Name="ChkRecentLinks" Style="{StaticResource CompactCheckBox}" Content="Недавние файлы и ярлыки" IsChecked="False"/>
+<CheckBox x:Name="ChkBam" Style="{StaticResource CompactCheckBox}" Content="История запуска программ (BAM/DAM)" IsChecked="False"/>
+<CheckBox x:Name="ChkExecution" Style="{StaticResource CompactCheckBox}" Content="Кэш запуска программ (Prefetch / Amcache)" IsChecked="False"/>
+<CheckBox x:Name="ChkExplorerMru" Style="{StaticResource CompactCheckBox}" Content="История Проводника и окон выбора файлов" IsChecked="False"/>
+<CheckBox x:Name="ChkRecycle" Style="{StaticResource CompactCheckBox}" Content="Записи USB-файлов в корзине" IsChecked="False"/>
+<CheckBox x:Name="ChkSelfTraces" Style="{StaticResource CompactCheckBox}" Content="История запуска утилит очистки" IsChecked="False"/>
+<CheckBox x:Name="ChkSystemLog" Style="{StaticResource CompactCheckBox}" Content="Включать системный журнал Windows" IsChecked="False"/>
+                                                </UniformGrid>
+                                            </StackPanel>
+                                        </ScrollViewer>
+                                    </Expander>
+                                </StackPanel>
                             </Border>
 
                             <Border x:Name="UsbResultsHost" Grid.Row="2" Style="{StaticResource MainCard}" MinHeight="180">
@@ -160,13 +145,18 @@
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="*" MinHeight="0"/>
+                                        <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
-                                    <Border Grid.Row="0" Background="#F8FAFC"
-                                            BorderBrush="{StaticResource BorderBrushModern}"
-                                            BorderThickness="0,0,0,1" Padding="14,10">
-                                        <TextBlock x:Name="TxtFoundCount" Text="Найдено: 0"
-                                                   FontWeight="SemiBold" FontSize="13"/>
-                                    </Border>
+                                    <StackPanel Grid.Row="0" Background="#F8FAFC" Margin="10">
+                                        <TextBlock x:Name="TxtFoundCount" Text="Найдено: 0" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap"/>
+                                        <DockPanel Margin="0,8,0,0">
+                                            <CheckBox x:Name="ChkDisconnectedOnly" DockPanel.Dock="Right" Content="Только отключённые"
+                                                Margin="12,0,0,0" VerticalAlignment="Center" Checked="UsbFilterChanged" Unchecked="UsbFilterChanged"/>
+                                            <TextBox x:Name="TxtDeviceSearch" Padding="7,5" TextChanged="UsbFilterChanged"
+                                                ToolTip="Поиск по имени устройства, пути, VID/PID или серийному номеру"/>
+                                        </DockPanel>
+                                        <TextBlock Text="Поиск по имени, пути или серийному номеру" FontSize="10" Foreground="#64748B" Margin="0,3,0,0"/>
+                                    </StackPanel>
                                     <DataGrid x:Name="GridArtifacts" Grid.Row="1"
                                               Style="{StaticResource ResultsDataGrid}"
                                               CellStyle="{StaticResource ResultsDataGridCell}"
@@ -174,68 +164,36 @@
                                               CanUserAddRows="False" CanUserDeleteRows="False"
                                               SelectionMode="Extended">
                                         <DataGrid.Columns>
-                                            <DataGridTemplateColumn Header="✓" Width="44" MinWidth="44" CanUserResize="False"
-                                                                    CellStyle="{StaticResource ResultsDataGridCheckCell}">
-                                                <DataGridTemplateColumn.CellTemplate>
-                                                    <DataTemplate>
-                                                        <CheckBox Style="{StaticResource GridCheckBox}"
-                                                                  IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}"
-                                                                  Click="ArtifactCheck_Click"/>
-                                                    </DataTemplate>
-                                                </DataGridTemplateColumn.CellTemplate>
+                                            <DataGridTemplateColumn Header="✓" Width="40" CanUserResize="False" CellStyle="{StaticResource ResultsDataGridCheckCell}">
+                                                <DataGridTemplateColumn.CellTemplate><DataTemplate>
+                                                    <CheckBox Style="{StaticResource GridCheckBox}" IsEnabled="{Binding CanSelect}"
+                                                        IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" Click="ArtifactCheck_Click"
+                                                        ToolTip="Подключённые устройства защищены от выбора"/>
+                                                </DataTemplate></DataGridTemplateColumn.CellTemplate>
                                             </DataGridTemplateColumn>
-                                            <DataGridTextColumn Header="Раздел" Binding="{Binding DisplayViewGroup}" IsReadOnly="True" Width="170" MinWidth="120">
-                                                <DataGridTextColumn.ElementStyle>
-                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
-                                                </DataGridTextColumn.ElementStyle>
+                                            <DataGridTextColumn Header="Устройство" Binding="{Binding DeviceName}" IsReadOnly="True" Width="300" MinWidth="220">
+                                                <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"><Setter Property="ToolTip" Value="{Binding DeviceName}"/></Style></DataGridTextColumn.ElementStyle>
                                             </DataGridTextColumn>
-                                            <DataGridTextColumn Header="Тип" Binding="{Binding Type}" IsReadOnly="True" Width="130" MinWidth="90">
-                                                <DataGridTextColumn.ElementStyle>
-                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
-                                                </DataGridTextColumn.ElementStyle>
+                                            <DataGridTextColumn Header="Состояние" Binding="{Binding DisplayConnection}" IsReadOnly="True" Width="155" MinWidth="105">
+                                                <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"><Setter Property="ToolTip" Value="{Binding DisplayConnection}"/></Style></DataGridTextColumn.ElementStyle>
                                             </DataGridTextColumn>
-                                            <DataGridTextColumn Header="Расположение" Binding="{Binding Location}" IsReadOnly="True" Width="480" MinWidth="320">
-                                                <DataGridTextColumn.ElementStyle>
-                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
-                                                </DataGridTextColumn.ElementStyle>
+                                            <DataGridTextColumn Header="Что найдено" Binding="{Binding DisplayType}" IsReadOnly="True" Width="130" MinWidth="105">
+                                                <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"><Setter Property="ToolTip" Value="{Binding DisplayType}"/></Style></DataGridTextColumn.ElementStyle>
                                             </DataGridTextColumn>
-                                            <DataGridTextColumn Header="Описание" Binding="{Binding Description}" IsReadOnly="True" Width="240" MinWidth="150">
-                                                <DataGridTextColumn.ElementStyle>
-                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
-                                                </DataGridTextColumn.ElementStyle>
-                                            </DataGridTextColumn>
-                                            <DataGridTextColumn Header="VID" Binding="{Binding DisplayVid}" IsReadOnly="True" Width="64" MinWidth="56">
-                                                <DataGridTextColumn.ElementStyle>
-                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
-                                                </DataGridTextColumn.ElementStyle>
-                                            </DataGridTextColumn>
-                                            <DataGridTextColumn Header="PID" Binding="{Binding DisplayPid}" IsReadOnly="True" Width="64" MinWidth="56">
-                                                <DataGridTextColumn.ElementStyle>
-                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
-                                                </DataGridTextColumn.ElementStyle>
-                                            </DataGridTextColumn>
-                                            <DataGridTextColumn Header="Производитель" Binding="{Binding DisplayManufacturer}" IsReadOnly="True" Width="180" MinWidth="120">
-                                                <DataGridTextColumn.ElementStyle>
-                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
-                                                </DataGridTextColumn.ElementStyle>
-                                            </DataGridTextColumn>
-                                            <DataGridTextColumn Header="Модель" Binding="{Binding DisplayModel}" IsReadOnly="True" Width="180" MinWidth="120">
-                                                <DataGridTextColumn.ElementStyle>
-                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
-                                                </DataGridTextColumn.ElementStyle>
-                                            </DataGridTextColumn>
-                                            <DataGridTextColumn Header="Первое подключение" Binding="{Binding DisplayFirstConnected}" IsReadOnly="True" Width="150" MinWidth="120">
-                                                <DataGridTextColumn.ElementStyle>
-                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
-                                                </DataGridTextColumn.ElementStyle>
-                                            </DataGridTextColumn>
-                                            <DataGridTextColumn Header="Источник" Binding="{Binding DisplaySource}" IsReadOnly="True" Width="160" MinWidth="130">
-                                                <DataGridTextColumn.ElementStyle>
-                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"/>
-                                                </DataGridTextColumn.ElementStyle>
+                                            <DataGridTextColumn Header="Где хранится" Binding="{Binding DisplaySource}" IsReadOnly="True" Width="135" MinWidth="105">
+                                                <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock" BasedOn="{StaticResource GridCellText}"><Setter Property="ToolTip" Value="{Binding DisplaySource}"/></Style></DataGridTextColumn.ElementStyle>
                                             </DataGridTextColumn>
                                         </DataGrid.Columns>
                                     </DataGrid>
+                                    <Border Grid.Row="2" Background="#EFF6FF" Padding="12" DataContext="{Binding SelectedItem, ElementName=GridArtifacts}">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding DeviceName, FallbackValue=Выберите строку для подробностей}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding DeviceNameSource}" FontSize="11" Foreground="#64748B" TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding CleanupEffect}" Margin="0,5,0,5" TextWrapping="Wrap" Foreground="#92400E"/>
+                                            <TextBox Text="{Binding DisplayLocation, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                                                TextWrapping="Wrap" MaxHeight="55" VerticalScrollBarVisibility="Auto" FontSize="11"/>
+                                        </StackPanel>
+                                    </Border>
                                 </Grid>
                             </Border>
                         </Grid>
@@ -266,18 +224,18 @@
                     <Button DockPanel.Dock="Left" x:Name="BtnUsbReport" Content="Отчёт PDF"
                             Style="{StaticResource SecondaryButton}" MinWidth="108" Margin="8,0,0,0"
                             Click="BtnUsbReport_Click"/>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                        <Button x:Name="BtnSelectAll" Content="Выбрать все" Style="{StaticResource SecondaryButton}"
+                    <WrapPanel HorizontalAlignment="Right">
+                        <Button x:Name="BtnSelectAll" Content="Выбрать видимые" Style="{StaticResource SecondaryButton}"
                                 MinWidth="108" Margin="0,0,8,0" Click="BtnSelectAll_Click"/>
                         <Button x:Name="BtnDeselectAll" Content="Снять все" Style="{StaticResource SecondaryButton}"
                                 MinWidth="108" Margin="0,0,8,0" Click="BtnDeselectAll_Click"/>
-                        <Button x:Name="BtnScan" Content="Сканировать" Style="{StaticResource PrimaryButton}"
+                        <Button x:Name="BtnScan" Content="Найти устройства" Style="{StaticResource PrimaryButton}"
                                 MinWidth="124" Margin="0,0,8,0" Click="BtnScan_Click"/>
-                        <Button x:Name="BtnFixDuplicates" Content="Удалить призраки" Style="{StaticResource SecondaryButton}"
+                        <Button x:Name="BtnFixDuplicates" Content="Найти старые записи" Style="{StaticResource SecondaryButton}"
                                 MinWidth="140" Margin="0,0,8,0" Click="BtnFixDuplicates_Click"/>
                         <Button x:Name="BtnClean" Content="Очистить" Style="{StaticResource DangerButton}"
                                 MinWidth="124" Click="BtnClean_Click"/>
-                    </StackPanel>
+                    </WrapPanel>
                 </DockPanel>
             </Border>
 

@@ -287,6 +287,8 @@ public static class DataGridScrollHelper
 
     public static void SizeLastColumnToContent(DataGrid grid)
     {
+        // A star-sized column deliberately owns the remaining viewport width.
+        if (grid.Columns.Any(column => column.Width.IsStar)) return;
         if (grid.Columns.Count == 0)
             return;
 

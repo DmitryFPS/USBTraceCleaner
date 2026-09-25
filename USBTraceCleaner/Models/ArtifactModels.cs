@@ -53,7 +53,36 @@ public sealed class ArtifactItem
     public string? ValueName { get; init; }
     public string? Description { get; init; }
     public string? Detail { get; init; }
-    public bool Selected { get; set; } = true;
+    private bool _selected = true;
+    public bool Selected { get => _selected && CanSelect; set => _selected = value && CanSelect; }
+    public string DeviceName { get; set; } = "Устройство не определено";
+    public string DeviceNameSource { get; set; } = "В записи нет достоверного имени устройства";
+    public IReadOnlyList<string> RelatedDeviceIds { get; set; } = [];
+    public bool? DevicePresent { get; set; }
+    public bool CanSelect => DevicePresent != true;
+    public string DisplayConnection => DevicePresent switch
+    {
+        true => "Подключено · защищено",
+        false => "Не подключено",
+        _ => "Состояние неизвестно"
+    };
+    public string DisplayType => Type switch
+    {
+        ArtifactType.RegistryKey => "Ветка реестра",
+        ArtifactType.RegistryValue => "Параметр реестра",
+        ArtifactType.File => "Файл",
+        ArtifactType.EventLog => "Журнал Windows",
+        _ => "Папка"
+    };
+    public string CleanupEffect => Type switch
+    {
+        ArtifactType.EventLog => "Очистится весь журнал, в том числе события других устройств.",
+        ArtifactType.File => "Файл будет удалён или изменён; .reg-копия его не восстановит.",
+        ArtifactType.RegistryKey => "Удалится выбранная ветка и её вложенные записи. Windows может создать их заново.",
+        ArtifactType.RegistryValue => "Удалится только указанный параметр реестра.",
+        _ => "Операция не поддерживается."
+    };
+    public string DisplayLocation => ValueName == null ? Location : $"{Location} → {ValueName}";
 
     private void EnsureIds()
     {
@@ -166,11 +195,13 @@ public sealed class ArtifactItem
 
 public sealed class CleanupOptions
 {
+    /// <summary>Общие журналы, история программ и дополнительные ветви — только по явному выбору.</summary>
+    public bool IncludeSharedArtifacts { get; set; } = false;
     public bool SimulationMode { get; set; } = true;
     public bool SaveBackup { get; set; } = true;
     /// <summary>По умолчанию выкл.: точка восстановления сама оставляет артефакт USBTraceCleaner.</summary>
     public bool CreateRestorePoint { get; set; } = false;
-    public bool CloseExplorer { get; set; } = true;
+    public bool CloseExplorer { get; set; } = false;
     public bool RebootAfterClean { get; set; } = false;
     public bool CleanMtpDevices { get; set; } = true;
     public bool CleanAllUsbDevices { get; set; } = false;

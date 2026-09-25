@@ -68,15 +68,15 @@ public class CleanerSimulationTests
     }
 
     [Fact]
-    public void OtherUsbTraceCleaner_WithoutAdmin_ReturnsError()
+    public void OtherUsbTraceCleaner_Simulation_DoesNotRequireAdmin()
     {
         if (TestPrerequisites.IsAdmin) return;
 
         var result = OtherUsbTraceCleaner.Execute(
-            [new OtherUsbTraceItem { Vid = "FFFF", Pid = "FFFF" }],
+            [new OtherUsbTraceItem { Vid = "FFFF", Pid = "FFFF", Selected = true, RegistryPaths = [@"SYSTEM\Test"] }],
             simulation: true);
 
-        Assert.False(result.Success);
-        Assert.Contains("администратора", result.ErrorMessage);
+        Assert.True(result.Success);
+        Assert.Contains("[SIM]", result.Log);
     }
 }

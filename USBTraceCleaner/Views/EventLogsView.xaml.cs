@@ -200,7 +200,7 @@ public partial class EventLogsView : UserControl
         }
 
         var includeSecurity = ChkIncludeSecurity.IsChecked == true;
-        var clearSystemLast = ChkClearSystemLast.IsChecked == true;
+        var clearSystemLast = false;
         // System — всегда последним среди выбранных (сначала остальные, потом Система)
         var selected = _channels
             .Where(c => c.Selected && (includeSecurity || !c.IsSecurity))
@@ -225,9 +225,7 @@ public partial class EventLogsView : UserControl
         if (selected.Count > 25)
             names += $"\n… и ещё {selected.Count - 25}";
 
-        var systemNote = clearSystemLast
-            ? "\n\nВ конце «Система» будет полностью обнулена (wevtutil + файл System.evtx), чтобы не осталось Event ID 104."
-            : "\n\nБез финальной очистки в «Система» останутся Event ID 104.";
+        var systemNote = "\n\nУдалятся все события выбранных журналов, включая не связанные с USB. Это нельзя отменить.";
 
         var confirm = MessageBox.Show(
             owner,
@@ -309,17 +307,6 @@ public partial class EventLogsView : UserControl
                 foreach (var ch in selected)
                     ApplyOutcome(ch.Channel, WindowsEventLogBrowser.ClearChannel(ch.Channel));
 
-                // Финал: убрать и 104 от других логов, и 104 от самой очистки System
-                if (clearSystemLast)
-                {
-                    reporter.Report((done, "--- Полная очистка System (без остаточного Event ID 104) ---"));
-                    var purgeLines = new List<string>();
-                    var purge = WindowsEventLogBrowser.PurgeSystemLogCompletely(purgeLines.Add);
-                    foreach (var pl in purgeLines)
-                        reporter.Report((done, "  " + pl));
-                    ApplyOutcome("System (полная)", purge, "[OK] финал");
-                }
-
                 return (localOk, localSkip, localDeniedCount, localFail, localDeniedList, localFails);
             });
 
@@ -338,8 +325,7 @@ public partial class EventLogsView : UserControl
             if (fail > 0)
                 summary += $"\nОшибок: {fail}";
 
-            if (clearSystemLast)
-                summary += "\n\nЖурнал «Система» полностью обнулён в конце (без остаточного Event ID 104).";
+
 
             if (deniedDetails.Count > 0)
             {

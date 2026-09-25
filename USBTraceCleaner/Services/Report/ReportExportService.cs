@@ -84,9 +84,9 @@ public static class ReportExportService
         {
             Selected = i.Selected,
             Group = i.DisplayViewGroup,
-            Type = i.Type.ToString(),
-            Location = i.Location,
-            Description = i.Description ?? i.Detail ?? ""
+            Type = i.DisplayType,
+            Location = i.DisplayLocation,
+            Description = $"{i.DeviceName} · {i.DisplayConnection}\n{i.Description ?? i.Detail}\n{i.CleanupEffect}"
         }).ToList();
 
         return new PdfReportRequest
