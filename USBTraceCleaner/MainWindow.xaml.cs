@@ -108,18 +108,27 @@ public partial class MainWindow : Window
 
     private async void BtnClean_Click(object sender, RoutedEventArgs e)
     {
-        var answer = MessageBox.Show(
-            "Будут УДАЛЕНЫ следы USB-устройств из реестра (реальная очистка).\n\n" +
-            "• Отключите все USB-флешки и внешние диски\n" +
-            "• Рядом с программой сохранится .reg-бэкап\n" +
-            "• Ядро очистки всегда удаляет USB-накопители\n" +
-            "• После очистки ОБЯЗАТЕЛЬНА перезагрузка\n\n" +
-            "Продолжить?",
-            "Подтверждение очистки",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning);
-
-        if (answer != MessageBoxResult.Yes) return;
+        GridArtifacts.CommitEdit(DataGridEditingUnit.Cell, true);
+        GridArtifacts.CommitEdit(DataGridEditingUnit.Row, true);
+        var selectedCount = _allItems.Count(i => i.Selected);
+        if (selectedCount == 0)
+        {
+            MessageBox.Show("Сначала выполните сканирование и выберите элементы.", "Очистка");
+            return;
+        }
+        var options = BuildOptions();
+        if (!options.SimulationMode)
+        {
+            var answer = MessageBox.Show(
+                $"Будут обработаны выбранные элементы: {selectedCount}.\n\n" +
+                "Отключите USB-накопители перед очисткой.\n" +
+                (options.SaveBackup ? "Будет создан .reg-бэкап выбранных ветвей реестра.\n" : "Резервная копия отключена.\n") +
+                "Удалённые файлы и журналы событий .reg-бэкап не восстанавливает.\n" +
+                (options.RebootAfterClean ? "После успешной очистки Windows перезагрузится.\n" : "") +
+                "\nПродолжить?", "Подтверждение очистки",
+                MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (answer != MessageBoxResult.Yes) return;
+        }
 
         await RunOperation(scanOnly: false);
     }
@@ -143,7 +152,7 @@ public partial class MainWindow : Window
                     ProgressBar.Value = (double)p.ItemsProcessed / p.ItemsFound * 100;
             });
 
-            if (scanOnly || _allItems.Count == 0)
+            if (scanOnly)
             {
                 var found = await Task.Run(() => _scanner.Scan(options, progress), _cts.Token);
                 LoadScanResults(found);
@@ -155,7 +164,11 @@ public partial class MainWindow : Window
                 var result = await _cleaner.ExecuteAsync(_allItems, options, progress, _cts.Token);
                 _lastUsbCleanResult = result;
                 AppendLog(result.Log);
-                LoadScanResults(_allItems.ToList());
+                if (!options.SimulationMode)
+                {
+                    var remaining = await Task.Run(() => _scanner.Scan(options), _cts.Token);
+                    LoadScanResults(remaining);
+                }
                 UpdateCategoryCounts();
 
                 if (!result.Success)
@@ -164,11 +177,12 @@ public partial class MainWindow : Window
                 }
                 else
                 {
-                    var msg = $"Очистка завершена.\nОбработано: {result.ItemsProcessed} элементов.";
+                    var msg = $"{(options.SimulationMode ? "Симуляция" : "Очистка")} завершена.\nОбработано: {result.ItemsProcessed} элементов.";
                     msg += $"\nСледов USB-накопителей осталось: {result.UsbStorRemaining}";
                     if (result.FailedCount > 0)
                         msg += $"\n\n⚠ Не удалось: {result.FailedCount} (см. лог)";
-                    msg += options.RebootAfterClean
+                    if (!options.SimulationMode && result.ItemsProcessed > 0)
+                        msg += options.RebootAfterClean
                         ? "\n\nWindows перезагрузится через 5 секунд."
                         : "\n\n⚠ Перезагрузите Windows — без этого USBDeview может показывать старые данные!";
                     MessageBox.Show(msg, "Готово", MessageBoxButton.OK,
@@ -197,6 +211,8 @@ public partial class MainWindow : Window
         }
         finally
         {
+            _cts?.Dispose();
+            _cts = null;
             SetBusy(false);
             ProgressBar.Value = 0;
         }
@@ -231,7 +247,7 @@ public partial class MainWindow : Window
             CleanExecutionArtifacts = ChkExecution.IsChecked == true,
             CleanExplorerMru = ChkExplorerMru.IsChecked == true,
             CleanRecycleBinUsb = ChkRecycle.IsChecked == true,
-            CleanVolumeShadowCopies = ChkVss.IsChecked == true,
+            CleanVolumeShadowCopies = false,
             CleanSelfTraces = ChkSelfTraces.IsChecked == true,
             CleanSystemEventLog = ChkSystemLog.IsChecked == true,
             CleanOrphanUsbFlags = true,

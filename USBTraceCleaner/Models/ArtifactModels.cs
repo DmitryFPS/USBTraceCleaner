@@ -166,12 +166,12 @@ public sealed class ArtifactItem
 
 public sealed class CleanupOptions
 {
-    public bool SimulationMode { get; set; } = false;
+    public bool SimulationMode { get; set; } = true;
     public bool SaveBackup { get; set; } = true;
     /// <summary>По умолчанию выкл.: точка восстановления сама оставляет артефакт USBTraceCleaner.</summary>
     public bool CreateRestorePoint { get; set; } = false;
     public bool CloseExplorer { get; set; } = true;
-    public bool RebootAfterClean { get; set; } = true;
+    public bool RebootAfterClean { get; set; } = false;
     public bool CleanMtpDevices { get; set; } = true;
     public bool CleanAllUsbDevices { get; set; } = false;
     public bool CleanKeyboardMouse { get; set; } = false;
@@ -195,7 +195,7 @@ public sealed class CleanupOptions
     /// <summary>$Recycle.Bin записи с USB/removable путями.</summary>
     public bool CleanRecycleBinUsb { get; set; } = true;
     /// <summary>Удалить все Volume Shadow Copies (иначе setupapi возвращается из VSS).</summary>
-    public bool CleanVolumeShadowCopies { get; set; } = true;
+    public bool CleanVolumeShadowCopies { get; set; } = false;
     /// <summary>Следы USBTraceCleaner / USBOblivion / USBDeview / USBDetector.</summary>
     public bool CleanSelfTraces { get; set; } = true;
     /// <summary>Очистить журнал System (UserPnp USBSTOR + прошлые Event ID 104).</summary>

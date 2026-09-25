@@ -106,7 +106,7 @@
                                         <StackPanel>
                                             <TextBlock Text="БЭКАП" Style="{StaticResource SectionHeader}"/>
                                             <CheckBox x:Name="ChkSimulation" Style="{StaticResource CompactCheckBox}"
-                                                      Content="Симуляция (без удаления)" IsChecked="False"
+                                                      Content="Симуляция (без удаления)" IsChecked="True"
                                                       ToolTip="Прогон очистки без изменений реестра, файлов и журналов"/>
                                             <CheckBox x:Name="ChkBackup" Style="{StaticResource CompactCheckBox}"
                                                       Content="Сохранить .reg-бэкап" IsChecked="True"/>
@@ -120,7 +120,7 @@
                                             <CheckBox x:Name="ChkCloseExplorer" Style="{StaticResource CompactCheckBox}"
                                                       Content="Закрыть Проводник" IsChecked="True"/>
                                             <CheckBox x:Name="ChkReboot" Style="{StaticResource CompactCheckBox}"
-                                                      Content="Перезагрузить Windows" IsChecked="True"/>
+                                                      Content="Перезагрузить Windows" IsChecked="False"/>
                                             <CheckBox x:Name="ChkMtp" Style="{StaticResource CompactCheckBox}"
                                                       Content="Очищать MTP (телефоны)" IsChecked="True"/>
                                         </StackPanel>
@@ -145,7 +145,7 @@
                                             <CheckBox x:Name="ChkRecycle" Style="{StaticResource CompactCheckBox}"
                                                       Content="Recycle Bin (USB)" IsChecked="True"/>
                                             <CheckBox x:Name="ChkVss" Style="{StaticResource CompactCheckBox}"
-                                                      Content="Удалить VSS (теневые копии)" IsChecked="True"/>
+                                                      Content="VSS недоступны при выборочной очистке" IsChecked="False" IsEnabled="False"/>
                                             <CheckBox x:Name="ChkSelfTraces" Style="{StaticResource CompactCheckBox}"
                                                       Content="Self-trace утилит очистки" IsChecked="True"/>
                                             <CheckBox x:Name="ChkSystemLog" Style="{StaticResource CompactCheckBox}"

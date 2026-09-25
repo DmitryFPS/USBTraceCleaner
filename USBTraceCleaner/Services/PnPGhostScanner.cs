@@ -129,7 +129,7 @@ public static class PnPGhostScanner
             var keeper = ChooseKeeper(list);
             foreach (var entry in list)
             {
-                if (IsKeeper(entry, keeper))
+                if (IsKeeper(entry, keeper) || DeviceUninstallHelper.IsDevicePresent(entry.DeviceInstanceId))
                     continue;
 
                 marked.Add(entry.RegistryPath);
@@ -177,19 +177,8 @@ public static class PnPGhostScanner
                 return entry;
         }
 
-        if (!registryPath.Contains(@"\Enum\", StringComparison.OrdinalIgnoreCase))
-            return null;
-
-        var deviceId = TryBuildDeviceIdFromRegistryPath(registryPath);
-        return new GhostEntry(
-            ExtractControlSet(registryPath),
-            ExtractVidKey(registryPath),
-            ExtractInstance(registryPath),
-            registryPath,
-            deviceId ?? registryPath,
-            RegistryHelper.GetStringValueAt(RegistryHive.LocalMachine, registryPath, "Service"),
-            GhostKind.Orphan,
-            null);
+        // A stale scan is not authorization to delete an arbitrary Enum path.
+        return null;
     }
 
     private static List<GhostEntry> CollectEnumUsbInstances()
@@ -256,7 +245,7 @@ public static class PnPGhostScanner
                             var regPath = $@"{typePath}\{serial}";
                             var deviceId = $@"USBSTOR\{deviceType}\{serial}";
                             if (DeviceUninstallHelper.IsDevicePresent(deviceId))
-                                return;
+                                continue;
 
                             result.Add(new GhostEntry(
                                 controlSet,
@@ -332,7 +321,11 @@ public static class PnPGhostScanner
     {
         try
         {
-            DeviceUninstallHelper.TryRemoveDevice(entry.DeviceInstanceId);
+            if (DeviceUninstallHelper.IsDevicePresent(entry.DeviceInstanceId))
+            {
+                log?.Invoke($"[FAIL] Устройство подключено: {entry.DeviceInstanceId}");
+                return false;
+            }
 
             if (!RegistryHelper.KeyExists(RegistryHive.LocalMachine, entry.RegistryPath))
             {

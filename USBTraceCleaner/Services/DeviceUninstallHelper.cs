@@ -13,7 +13,7 @@ public static class DeviceUninstallHelper
     private const int CmUninstallDefault = 0;
     private const int CmDisableUiNotOk = 0x00000001;
 
-    [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern int CM_Locate_DevNode(out uint pdnDevInst, string? pDeviceId, int ulFlags);
 
     [DllImport("cfgmgr32.dll", SetLastError = true)]

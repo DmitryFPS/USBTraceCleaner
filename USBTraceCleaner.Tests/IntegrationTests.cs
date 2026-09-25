@@ -30,7 +30,7 @@ public class IntegrationTests
         Assert.Contains("[SIM]", result.Log);
     }
 
-    [Fact]
+    [Fact(Skip = "Destructive test: run manually in a disposable Windows VM only.")]
     public async Task Cleaner_RealRun_ClearsUsbStor()
     {
         if (!TestPrerequisites.CanRunDestructiveUsbStorTest) return;

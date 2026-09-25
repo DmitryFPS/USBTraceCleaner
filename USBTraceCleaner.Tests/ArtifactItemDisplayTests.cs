@@ -151,7 +151,7 @@ public class ArtifactItemDisplayTests
     public void CleanupOptions_Defaults()
     {
         var o = new CleanupOptions();
-        Assert.True(o.SimulationMode == false);
+        Assert.True(o.SimulationMode);
         Assert.True(o.SaveBackup);
         Assert.True(o.ScanPnPGhosts);
     }

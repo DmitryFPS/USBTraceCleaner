@@ -407,7 +407,7 @@ public static class RegistryHelper
         RunReg($"export \"{hivePrefix}\\{subKey}\" \"{filePath}\" /y");
     }
 
-    public static void MergeRegExports(IEnumerable<(string HivePrefix, string SubKey)> exports, string outputFile)
+    public static void MergeRegExports(IEnumerable<(string HivePrefix, string SubKey)> exports, string outputFile, bool requireComplete = false)
     {
         const string header = "Windows Registry Editor Version 5.00\r\n\r\n";
         using var writer = new StreamWriter(outputFile, false, Encoding.Unicode);
@@ -422,8 +422,9 @@ public static class RegistryHelper
             foreach (var (hivePrefix, subKey) in exports)
             {
                 var tempFile = Path.Combine(tempDir, $"part_{index++}.reg");
-                ExportKey(hivePrefix, subKey, tempFile);
-
+                var exitCode = RunReg($"export \"{hivePrefix}\\{subKey}\" \"{tempFile}\" /y");
+                if (requireComplete && (exitCode != 0 || !File.Exists(tempFile)))
+                    throw new IOException($"Резервная копия не создана: {hivePrefix}\\{subKey}. Очистка отменена.");
                 if (!File.Exists(tempFile)) continue;
 
                 var content = File.ReadAllText(tempFile, Encoding.Unicode);

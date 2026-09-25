@@ -3,7 +3,7 @@ using USBTraceCleaner.Models;
 
 namespace USBTraceCleaner.Services;
 
-// USBTraceCleaner.exe --clean  (полный forensic-путь, как GUI с максимальными опциями)
+// USBTraceCleaner.exe --clean: обработка всех найденных элементов без глобальной зачистки.
 [ExcludeFromCodeCoverage]
 public static class HeadlessCleaner
 {
@@ -36,7 +36,7 @@ public static class HeadlessCleaner
             CleanExecutionArtifacts = true,
             CleanExplorerMru = true,
             CleanRecycleBinUsb = true,
-            CleanVolumeShadowCopies = true,
+            CleanVolumeShadowCopies = false,
             CleanSelfTraces = true,
             CleanOrphanUsbFlags = true,
             CleanAllUsbFlags = true,
